@@ -1,0 +1,1631 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Santex Express - ERP Tizimi</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0891b2">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Santex Express">
+    <link rel="icon" href="icon-192.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+        body { font-family: 'Inter', sans-serif; }
+        .sidebar { transition: all 0.3s ease; }
+        .page { display: none; animation: fadeIn 0.3s; }
+        .page.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .card-hover { transition: all 0.2s; }
+        .card-hover:hover { transform: translateY(-2px); box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); }
+        .product-card { transition: all 0.2s; cursor: pointer; }
+        .product-card:hover { transform: scale(1.02); box-shadow: 0 10px 30px -10px rgba(14,165,233,0.3); }
+        .cart-item { animation: slideIn 0.2s; }
+        @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .low-stock { border-left: 4px solid #ef4444; }
+        .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        @media print {
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            body { background: white; }
+            body.printing-receipt > *:not(#receiptPrintArea) { display: none !important; }
+            body.printing-receipt #receiptPrintArea { display: block !important; width: 280px; margin: 0 auto; font-family: 'Courier New', monospace; }
+        }
+        .print-only { display: none; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+<!-- LOGIN -->
+
+<div id="loginPage" class="min-h-[100dvh] flex items-center justify-center bg-gradient-to-br from-cyan-600 to-blue-700">
+    <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md mx-4">
+        <div class="text-center mb-8">
+            <div class="w-16 h-16 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                <i class="fas fa-faucet text-white text-2xl"></i>
+            </div>
+            <h1 class="text-2xl font-bold text-slate-800">Santex Express</h1>
+            <p class="text-slate-500 text-sm mt-1">ERP Tizimi</p>
+        </div>
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Login</label>
+                <input type="text" id="loginUser" value="admin" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Parol</label>
+                <input type="password" id="loginPass" value="admin123" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">
+            </div>
+            <button onclick="doLogin()" class="w-full bg-gradient-to-r from-cyan-600 to-blue-600 text-white py-2.5 rounded-lg font-medium hover:from-cyan-700 hover:to-blue-700 transition shadow-lg">
+                <i class="fas fa-sign-in-alt mr-2"></i>Kirish
+            </button>
+            <button onclick="resetDemoData()" class="w-full text-cyan-600 text-sm py-2 hover:underline">
+                <i class="fas fa-undo mr-1"></i>Demo ma'lumotlarni tiklash
+            </button>
+        </div>
+        <div class="mt-4 text-center text-xs text-slate-400">
+            Login: admin | Parol: admin123
+        </div>
+    </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app" class="hidden h-[100dvh] flex flex-col md:flex-row overflow-hidden">
+    
+    <!-- SIDEBAR -->
+    <aside id="sidebar" class="sidebar w-64 bg-slate-900 text-white flex flex-col h-full flex-shrink-0 z-20 fixed md:relative -translate-x-full md:translate-x-0">
+        <div class="p-6 border-b border-slate-800">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg flex items-center justify-center shadow-lg">
+                    <i class="fas fa-faucet text-white"></i>
+                </div>
+                <div>
+                    <h2 class="font-bold text-lg leading-tight">Santex Express</h2>
+                    <p class="text-xs text-slate-400">ERP Tizimi</p>
+                </div>
+            </div>
+        </div>
+        <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-1">
+            <button onclick="navTo('dashboard')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition hover:bg-slate-800 text-slate-300 hover:text-white group" data-page="dashboard">
+                <i class="fas fa-chart-line w-5 text-center group-hover:text-cyan-400"></i><span>Boshqaruv paneli</span>
+            </button>
+            <button onclick="navTo('pos')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition hover:bg-slate-800 text-slate-300 hover:text-white group" data-page="pos">
+                <i class="fas fa-cash-register w-5 text-center group-hover:text-cyan-400"></i><span>Sotish (POS)</span>
+            </button>
+            <button onclick="navTo('inventory')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition hover:bg-slate-800 text-slate-300 hover:text-white group" data-page="inventory">
+                <i class="fas fa-boxes w-5 text-center group-hover:text-cyan-400"></i><span>Omborxona</span>
+                <span id="lowStockBadge" class="ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full hidden">0</span>
+            </button>
+            <button onclick="navTo('crm')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition hover:bg-slate-800 text-slate-300 hover:text-white group" data-page="crm">
+                <i class="fas fa-users w-5 text-center group-hover:text-cyan-400"></i><span>Mijozlar (CRM)</span>
+            </button>
+            <button onclick="navTo('marketing')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition hover:bg-slate-800 text-slate-300 hover:text-white group" data-page="marketing">
+                <i class="fas fa-bullhorn w-5 text-center group-hover:text-cyan-400"></i><span>Marketing</span>
+            </button>
+            <button onclick="navTo('employees')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition hover:bg-slate-800 text-slate-300 hover:text-white group" data-page="employees">
+                <i class="fas fa-user-tie w-5 text-center group-hover:text-cyan-400"></i><span>Xodimlar</span>
+            </button>
+            <button onclick="navTo('reports')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition hover:bg-slate-800 text-slate-300 hover:text-white group" data-page="reports">
+                <i class="fas fa-file-alt w-5 text-center group-hover:text-cyan-400"></i><span>Hisobotlar</span>
+            </button>
+        </nav>
+        <div class="px-4 pb-2">
+            <button id="installAppBtn" onclick="installApp()" class="hidden w-full flex items-center justify-center gap-2 px-3 py-2 mb-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-medium transition">
+                <i class="fas fa-download"></i> Ilovani o'rnatish
+            </button>
+            <div id="syncStatus" class="text-[11px] text-slate-500 flex items-center gap-1.5 px-2 py-1"></div>
+        </div>
+        <div class="p-4 border-t border-slate-800">
+            <div class="flex items-center gap-3 px-4 py-2">
+                <div class="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-sm font-bold">A</div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium truncate">Administrator</p>
+                    <p class="text-xs text-slate-400">Santex Express</p>
+                </div>
+                <button onclick="logout()" class="text-slate-400 hover:text-white transition"><i class="fas fa-sign-out-alt"></i></button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="flex-1 flex flex-col h-full overflow-hidden bg-slate-50 relative">
+        <header class="md:hidden bg-white border-b border-slate-200 p-4 flex items-center justify-between">
+            <button onclick="toggleSidebar()" class="text-slate-600"><i class="fas fa-bars text-xl"></i></button>
+            <h2 class="font-bold text-slate-800">Santex Express</h2>
+            <div class="w-8"></div>
+        </header>
+        <div class="flex-1 overflow-auto p-4 md:p-8" id="contentArea">
+            
+            <!-- DASHBOARD -->
+            <div id="page-dashboard" class="page active">
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <h1 class="text-2xl font-bold text-slate-800">Boshqaruv paneli</h1>
+                        <p class="text-slate-500 text-sm">Bugun: <span id="todayDate"></span></p>
+                    </div>
+                    <button onclick="navTo('pos')" class="bg-gradient-to-r from-cyan-600 to-blue-600 text-white px-6 py-2.5 rounded-xl font-medium hover:shadow-lg transition flex items-center gap-2">
+                        <i class="fas fa-plus"></i> Yangi sotuv
+                    </button>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 card-hover">
+                        <div class="flex justify-between items-start">
+                            <div><p class="text-slate-500 text-sm font-medium">Bugun sotuv</p><h3 class="text-2xl font-bold text-slate-800 mt-1" id="dashTodaySales">0 so'm</h3></div>
+                            <div class="w-10 h-10 rounded-xl bg-cyan-50 flex items-center justify-center text-cyan-600"><i class="fas fa-wallet"></i></div>
+                        </div>
+                    </div>
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 card-hover">
+                        <div class="flex justify-between items-start">
+                            <div><p class="text-slate-500 text-sm font-medium">Jami mahsulotlar</p><h3 class="text-2xl font-bold text-slate-800 mt-1" id="dashTotalProducts">0</h3></div>
+                            <div class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600"><i class="fas fa-box"></i></div>
+                        </div>
+                        <p class="text-xs text-red-500 mt-2 font-medium" id="dashLowStock">0 ta kam qoldi</p>
+                    </div>
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 card-hover">
+                        <div class="flex justify-between items-start">
+                            <div><p class="text-slate-500 text-sm font-medium">Mijozlar</p><h3 class="text-2xl font-bold text-slate-800 mt-1" id="dashTotalCustomers">0</h3></div>
+                            <div class="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center text-purple-600"><i class="fas fa-users"></i></div>
+                        </div>
+                    </div>
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 card-hover">
+                        <div class="flex justify-between items-start">
+                            <div><p class="text-slate-500 text-sm font-medium">Qarzdorlik</p><h3 class="text-2xl font-bold text-slate-800 mt-1" id="dashTotalDebt">0 so'm</h3></div>
+                            <div class="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-orange-600"><i class="fas fa-hand-holding-usd"></i></div>
+                        </div>
+                        <p class="text-xs text-orange-500 mt-2 font-medium" id="dashDebtCount">0 ta mijoz</p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                    <div class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                        <h3 class="font-bold text-slate-800 mb-4">Sotuv dinamikasi (oxirgi 7 kun)</h3>
+                        <canvas id="salesChart" height="100"></canvas>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                        <h3 class="font-bold text-slate-800 mb-4">Kategoriya bo'yicha</h3>
+                        <canvas id="categoryChart" height="200"></canvas>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                        <h3 class="font-bold text-slate-800 mb-4">Oxirgi sotuvlar</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="text-slate-400 border-b border-slate-100"><tr><th class="text-left py-2 font-medium">ID</th><th class="text-left py-2 font-medium">Mijoz</th><th class="text-left py-2 font-medium">Summa</th><th class="text-left py-2 font-medium">Vaqt</th><th class="text-center py-2 font-medium">Chek</th></tr></thead>
+                                <tbody id="recentOrdersTable" class="text-slate-600"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                        <h3 class="font-bold text-slate-800 mb-4">Kam qolgan mahsulotlar</h3>
+                        <div id="lowStockList" class="space-y-3"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- POS -->
+            <div id="page-pos" class="page h-full">
+                <div class="flex flex-col lg:flex-row gap-4 lg:gap-6 h-full min-h-0">
+                    <div class="flex flex-col min-h-0 basis-0 flex-[2] lg:flex-1">
+                        <div class="flex gap-2 sm:gap-3 mb-3 flex-shrink-0">
+                            <div class="flex-1 relative min-w-0">
+                                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                <input type="text" id="posSearch" placeholder="Mahsulot qidirish..." oninput="filterPosProducts()" class="w-full pl-10 pr-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500 outline-none">
+                            </div>
+                            <select id="posCategory" onchange="filterPosProducts()" class="w-32 sm:w-auto flex-shrink-0 px-2 sm:px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500 outline-none bg-white text-sm"></select>
+                        </div>
+                        <div id="posResultCount" class="text-xs text-slate-400 mb-2 flex-shrink-0"></div>
+                        <div id="posProducts" class="grid gap-2.5 sm:gap-3 overflow-y-auto flex-1 min-h-0 content-start auto-rows-max pb-4" style="grid-template-columns: repeat(auto-fill, minmax(135px, 1fr));"></div>
+                    </div>
+                    <div class="w-full lg:w-[30rem] bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col min-h-0 basis-0 flex-[3] lg:flex-none lg:h-full">
+                        <div class="p-3 sm:p-4 border-b border-slate-100 flex justify-between items-center flex-shrink-0">
+                            <h3 class="font-bold text-slate-800"><i class="fas fa-shopping-cart mr-2 text-cyan-600"></i>Savat <span id="cartCount" class="text-xs font-normal text-slate-400"></span></h3>
+                            <button onclick="clearCart()" class="text-red-500 text-sm hover:text-red-700"><i class="fas fa-trash-alt"></i></button>
+                        </div>
+                        <div id="cartItems" class="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 space-y-2 sm:space-y-2.5">
+                            <div class="flex flex-col items-center justify-center text-center text-slate-400 py-12">
+                                <i class="fas fa-shopping-basket text-3xl mb-2 opacity-40"></i>
+                                <span>Savat bo'sh</span>
+                            </div>
+                        </div>
+                        <div class="p-3 sm:p-4 border-t border-slate-100 bg-slate-50 rounded-b-2xl flex-shrink-0 max-h-[60%] overflow-y-auto">
+                            <div class="space-y-1.5 sm:space-y-2 mb-3 sm:mb-4 text-sm">
+                                <div class="flex justify-between"><span class="text-slate-500">Jami:</span><span class="font-bold" id="cartSubtotal">0 so'm</span></div>
+                                <div class="flex justify-between items-center"><span class="text-slate-500">Chegirma:</span><input type="number" id="cartDiscount" value="0" min="0" onchange="updateCartTotals()" class="w-24 text-right border rounded px-2 py-0.5 text-sm"></div>
+                                <div class="flex justify-between text-lg font-bold text-slate-800 border-t border-slate-200 pt-2"><span>Umumiy:</span><span id="cartTotal">0 so'm</span></div>
+                            </div>
+                            <div class="mb-2.5 sm:mb-3">
+                                <select id="cartCustomer" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-cyan-500 outline-none"></select>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2 mb-2.5 sm:mb-3">
+                                <button onclick="setPayment('cash')" class="pay-btn active bg-cyan-600 text-white py-2 sm:py-2.5 rounded-lg text-sm font-medium border border-cyan-600" data-pay="cash">Naqd</button>
+                                <button onclick="setPayment('card')" class="pay-btn bg-white text-slate-600 py-2 sm:py-2.5 rounded-lg text-sm font-medium border border-slate-200" data-pay="card">Karta</button>
+                                <button onclick="setPayment('transfer')" class="pay-btn bg-white text-slate-600 py-2 sm:py-2.5 rounded-lg text-sm font-medium border border-slate-200" data-pay="transfer">O'tkazma</button>
+                                <button onclick="setPayment('nasiya')" class="pay-btn bg-white text-slate-600 py-2 sm:py-2.5 rounded-lg text-sm font-medium border border-slate-200" data-pay="nasiya">Nasiya</button>
+                            </div>
+                            <div id="nasiyaPaidWrap" class="hidden mb-2.5 sm:mb-3">
+                                <label class="text-xs text-slate-500 block mb-1">Hozir to'langan summa (0 bo'lishi ham mumkin)</label>
+                                <input type="number" id="nasiyaPaid" value="0" min="0" class="w-full px-3 py-2 border border-orange-300 rounded-lg text-sm focus:ring-2 focus:ring-cyan-500 outline-none">
+                            </div>
+                            <button onclick="checkout()" class="w-full bg-gradient-to-r from-cyan-600 to-blue-600 text-white py-2.5 sm:py-3 rounded-xl font-bold hover:shadow-lg transition">
+                                <i class="fas fa-check-circle mr-2"></i>Sotish
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- INVENTORY -->
+            <div id="page-inventory" class="page">
+                <div class="flex justify-between items-center mb-6">
+                    <h1 class="text-2xl font-bold text-slate-800">Omborxona</h1>
+                    <button onclick="openProductModal()" class="bg-gradient-to-r from-cyan-600 to-blue-600 text-white px-5 py-2.5 rounded-xl font-medium hover:shadow-lg transition flex items-center gap-2">
+                        <i class="fas fa-plus"></i> Mahsulot qo'shish
+                    </button>
+                </div>
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+                    <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+                        <p class="text-slate-400 text-xs sm:text-sm mb-1">Sotuv narxida jami</p>
+                        <p id="invStatSaleValue" class="text-lg sm:text-2xl font-bold text-cyan-700 truncate">0 so'm</p>
+                    </div>
+                    <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+                        <p class="text-slate-400 text-xs sm:text-sm mb-1">Tannarxda jami</p>
+                        <p id="invStatCostValue" class="text-lg sm:text-2xl font-bold text-slate-700 truncate">0 so'm</p>
+                    </div>
+                    <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+                        <p class="text-slate-400 text-xs sm:text-sm mb-1">Mahsulot / dona</p>
+                        <p id="invStatCount" class="text-lg sm:text-2xl font-bold text-blue-700 truncate">0 / 0</p>
+                    </div>
+                    <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+                        <p class="text-slate-400 text-xs sm:text-sm mb-1">Kam qolgan</p>
+                        <p id="invStatLow" class="text-lg sm:text-2xl font-bold text-red-600 truncate">0</p>
+                    </div>
+                </div>
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                    <div class="p-4 border-b border-slate-100 flex flex-col sm:flex-row gap-3">
+                        <div class="relative flex-1">
+                            <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                            <input type="text" id="invSearch" oninput="renderInventory()" placeholder="Qidirish..." class="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">
+                        </div>
+                        <select id="invCategory" onchange="renderInventory()" class="px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none bg-white"><option value="">Barcha kategoriyalar</option></select>
+                        <div class="flex gap-2">
+                            <button onclick="exportInventoryCSV()" class="px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600 text-sm whitespace-nowrap"><i class="fas fa-download mr-1"></i> Excel</button>
+                            <input type="file" id="invImportFile" accept=".csv" class="hidden" onchange="importInventoryCSV(event)">
+                            <button onclick="document.getElementById('invImportFile').click()" class="px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600 text-sm whitespace-nowrap" title="Avval yuklab olingan Excel (CSV) faylni qayta yuklash"><i class="fas fa-upload mr-1"></i> Yuklash</button>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="bg-slate-50 text-slate-500">
+                                <tr><th class="text-left py-3 px-4 font-medium">#</th><th class="text-left py-3 px-4 font-medium">Nomi</th><th class="text-left py-3 px-4 font-medium">Kategoriya</th><th class="text-left py-3 px-4 font-medium">Shtrix-kod</th><th class="text-right py-3 px-4 font-medium">Narxi</th><th class="text-right py-3 px-4 font-medium">Sotib olish</th><th class="text-right py-3 px-4 font-medium">Qoldiq</th><th class="text-center py-3 px-4 font-medium">Amallar</th></tr>
+                            </thead>
+                            <tbody id="inventoryTable" class="divide-y divide-slate-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CRM -->
+            <div id="page-crm" class="page">
+                <div class="flex justify-between items-center mb-6">
+                    <h1 class="text-2xl font-bold text-slate-800">Mijozlar (CRM)</h1>
+                    <button onclick="openCustomerModal()" class="bg-gradient-to-r from-cyan-600 to-blue-600 text-white px-5 py-2.5 rounded-xl font-medium hover:shadow-lg transition flex items-center gap-2">
+                        <i class="fas fa-plus"></i> Mijoz qo'shish
+                    </button>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                        <div class="p-4 border-b border-slate-100">
+                            <input type="text" id="crmSearch" oninput="renderCRM()" placeholder="Mijoz qidirish..." class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-slate-50 text-slate-500">
+                                    <tr><th class="text-left py-3 px-4 font-medium">ID</th><th class="text-left py-3 px-4 font-medium">FIO</th><th class="text-left py-3 px-4 font-medium">Telefon</th><th class="text-left py-3 px-4 font-medium">Manzil</th><th class="text-right py-3 px-4 font-medium">Qarz</th><th class="text-right py-3 px-4 font-medium">Jami sotuv</th><th class="text-center py-3 px-4 font-medium">Amallar</th></tr>
+                                </thead>
+                                <tbody id="crmTable" class="divide-y divide-slate-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="space-y-4">
+                        <div class="bg-gradient-to-br from-cyan-500 to-blue-600 p-6 rounded-2xl text-white shadow-lg">
+                            <h3 class="font-bold text-lg mb-1">Jami qarzdorlik</h3>
+                            <p class="text-3xl font-bold" id="crmTotalDebt">0 so'm</p>
+                            <p class="text-cyan-100 text-sm mt-1" id="crmDebtCount">0 ta mijoz</p>
+                        </div>
+                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                            <h3 class="font-bold text-slate-800 mb-4">Eng faol mijozlar</h3>
+                            <div id="topCustomers" class="space-y-3"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MARKETING -->
+            <div id="page-marketing" class="page">
+                <div class="flex justify-between items-center mb-6">
+                    <h1 class="text-2xl font-bold text-slate-800">Marketing</h1>
+                    <button onclick="openCampaignModal()" class="bg-gradient-to-r from-cyan-600 to-blue-600 text-white px-5 py-2.5 rounded-xl font-medium hover:shadow-lg transition flex items-center gap-2">
+                        <i class="fas fa-plus"></i> Kampaniya yaratish
+                    </button>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100"><p class="text-slate-500 text-sm">Faol kampaniyalar</p><h3 class="text-2xl font-bold text-slate-800" id="mktActive">0</h3></div>
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100"><p class="text-slate-500 text-sm">Yuborilgan SMS</p><h3 class="text-2xl font-bold text-slate-800" id="mktSMS">0</h3></div>
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100"><p class="text-slate-500 text-sm">Chegirmalar soni</p><h3 class="text-2xl font-bold text-slate-800" id="mktDiscounts">0</h3></div>
+                </div>
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                    <div class="p-4 border-b border-slate-100 font-bold text-slate-800">Kampaniyalar ro'yxati</div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="bg-slate-50 text-slate-500">
+                                <tr><th class="text-left py-3 px-4 font-medium">Nomi</th><th class="text-left py-3 px-4 font-medium">Turi</th><th class="text-left py-3 px-4 font-medium">Mazmun</th><th class="text-left py-3 px-4 font-medium">Sana</th><th class="text-center py-3 px-4 font-medium">Holat</th><th class="text-center py-3 px-4 font-medium">Amallar</th></tr>
+                            </thead>
+                            <tbody id="marketingTable" class="divide-y divide-slate-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- EMPLOYEES -->
+            <div id="page-employees" class="page">
+                <div class="flex justify-between items-center mb-6">
+                    <h1 class="text-2xl font-bold text-slate-800">Xodimlar boshqaruvi</h1>
+                    <button onclick="openEmployeeModal()" class="bg-gradient-to-r from-cyan-600 to-blue-600 text-white px-5 py-2.5 rounded-xl font-medium hover:shadow-lg transition flex items-center gap-2">
+                        <i class="fas fa-plus"></i> Xodim qo'shish
+                    </button>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                    <div class="lg:col-span-3 bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-slate-50 text-slate-500">
+                                    <tr><th class="text-left py-3 px-4 font-medium">#</th><th class="text-left py-3 px-4 font-medium">FIO</th><th class="text-left py-3 px-4 font-medium">Lavozim</th><th class="text-left py-3 px-4 font-medium">Telefon</th><th class="text-right py-3 px-4 font-medium">Oylik</th><th class="text-center py-3 px-4 font-medium">Bugungi davomat</th><th class="text-center py-3 px-4 font-medium">Amallar</th></tr>
+                                </thead>
+                                <tbody id="employeeTable" class="divide-y divide-slate-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="space-y-4">
+                        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+                            <h3 class="font-bold text-slate-800 mb-3">Bugun ishga kelganlar</h3>
+                            <div class="text-3xl font-bold text-green-600 mb-1" id="empPresent">0<span class="text-lg text-slate-400">/<span id="empTotal">0</span></span></div>
+                            <div class="w-full bg-slate-100 rounded-full h-2 mt-2"><div id="empProgress" class="bg-green-500 h-2 rounded-full transition-all" style="width:0%"></div></div>
+                        </div>
+                        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+                            <h3 class="font-bold text-slate-800 mb-3">Oylik fond</h3>
+                            <p class="text-2xl font-bold text-slate-800" id="empSalaryFund">0 so'm</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- REPORTS -->
+            <div id="page-reports" class="page">
+                <h1 class="text-2xl font-bold text-slate-800 mb-6">Hisobotlar va tahlillar</h1>
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 mb-6 flex flex-col sm:flex-row flex-wrap gap-3 no-print">
+                    <input type="date" id="repFrom" class="px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">
+                    <input type="date" id="repTo" class="px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">
+                    <select id="repType" class="px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none bg-white">
+                        <option value="sales">Sotuvlar</option>
+                        <option value="products">Mahsulotlar</option>
+                        <option value="profit">Foyda</option>
+                    </select>
+                    <button onclick="generateReport()" class="bg-cyan-600 text-white px-6 py-2 rounded-lg hover:bg-cyan-700 transition"><i class="fas fa-filter mr-1"></i> Filtrlash</button>
+                    <button onclick="printReport()" class="px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600"><i class="fas fa-print mr-1"></i> Chop etish</button>
+                    <span class="flex-1"></span>
+                    <button onclick="exportBackup()" class="px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600" title="Barcha ma'lumotlarni JSON fayl sifatida yuklab olish"><i class="fas fa-cloud-download-alt mr-1"></i> Zaxira olish</button>
+                    <input type="file" id="restoreFile" accept="application/json" class="hidden" onchange="importBackup(event)">
+                    <button onclick="document.getElementById('restoreFile').click()" class="px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600" title="Zaxira fayldan ma'lumotlarni tiklash"><i class="fas fa-cloud-upload-alt mr-1"></i> Tiklash</button>
+                </div>
+                <div id="reportContent" class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+                    <div class="text-center text-slate-400 py-12">Sanalarni tanlab, "Filtrlash" tugmasini bosing</div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+</div>
+
+<!-- MODAL -->
+<div id="modalOverlay" class="fixed inset-0 bg-black/50 hidden z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+    <div id="modalContent" class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto transform transition-all scale-95 opacity-0"></div>
+</div>
+
+<!-- TOAST -->
+<div id="toastContainer" class="fixed bottom-4 right-4 z-50 space-y-2"></div>
+
+<!-- RECEIPT PRINT AREA (faqat chop etishda ko'rinadi) -->
+<div id="receiptPrintArea" class="hidden"></div>
+
+<script>
+// ==================== DATA ====================
+const defaultData = {
+    users: [{id:1, username:'admin', password:'admin123', name:'Administrator', role:'admin'}],
+    categories: ['Kranlar', 'Smesitellar', 'Trubalar', 'Vanna', 'Unitaz', 'Radiatorlar', 'Aksessuarlar', 'Xizmatlar'],
+    products: [
+        {id:1, name:'Sharavoy kran (latun)', category:'Kranlar', price:45000, cost:28000, stock:12, barcode:'10001', minStock:5},
+        {id:2, name:'Smesitel (lux)', category:'Smesitellar', price:185000, cost:120000, stock:8, barcode:'10002', minStock:3},
+        {id:3, name:'Sharavoy kran (kulrang)', category:'Kranlar', price:52000, cost:32000, stock:3, barcode:'10003', minStock:5},
+        {id:4, name:'Polipropilen truba 20mm', category:'Trubalar', price:8500, cost:5000, stock:150, barcode:'10004', minStock:20},
+        {id:5, name:'Polipropilen truba 25mm', category:'Trubalar', price:10500, cost:6200, stock:120, barcode:'10005', minStock:20},
+        {id:6, name:'Akryl vanna 170x70', category:'Vanna', price:2450000, cost:1800000, stock:4, barcode:'10006', minStock:2},
+        {id:7, name:'Unitaz (kompakt)', category:'Unitaz', price:890000, cost:600000, stock:6, barcode:'10007', minStock:3},
+        {id:8, name:'Radiator bimetall 10 seksiya', category:'Radiatorlar', price:650000, cost:450000, stock:2, barcode:'10008', minStock:5},
+        {id:9, name:'Ugolnik PPR 20x90', category:'Aksessuarlar', price:3500, cost:1800, stock:200, barcode:'10009', minStock:30},
+        {id:10, name:'Mufta PPR 20mm', category:'Aksessuarlar', price:2800, cost:1500, stock:180, barcode:'10010', minStock:30},
+        {id:11, name:'Vinta (stoyka)', category:'Aksessuarlar', price:15000, cost:8000, stock:25, barcode:'10011', minStock:10},
+        {id:12, name:'O\'rnatish xizmati (vanna)', category:'Xizmatlar', price:350000, cost:150000, stock:999, barcode:'SRV01', minStock:0},
+        {id:13, name:'O\'rnatish xizmati (unitaz)', category:'Xizmatlar', price:200000, cost:80000, stock:999, barcode:'SRV02', minStock:0},
+        {id:14, name:'Rakovina (keramika)', category:'Vanna', price:420000, cost:280000, stock:7, barcode:'10014', minStock:3},
+        {id:15, name:'Kollektor 4-vyhod', category:'Aksessuarlar', price:185000, cost:110000, stock:5, barcode:'10015', minStock:3},
+    ],
+    customers: [
+        {id:1, name:'Alisher Umarov', phone:'+998901234567', address:'Toshkent, Yunusobod', debt:0, totalPurchases:1250000},
+        {id:2, name:'Dilshod Rahimov', phone:'+998907654321', address:'Toshkent, Chilonzor', debt:450000, totalPurchases:2800000},
+        {id:3, name:'Nodira Karimova', phone:'+998935551122', address:'Toshkent, Yashnobod', debt:0, totalPurchases:650000},
+        {id:4, name:'Bekzod Tursunov', phone:'+998977773344', address:'Toshkent, Mirzo-Ulug\'bek', debt:1200000, totalPurchases:5400000},
+    ],
+    orders: [],
+    employees: [
+        {id:1, name:'Valijon Toshpolatov', role:'Sotuvchi', phone:'+998901112233', salary:2500000, hireDate:'2024-01-15', attendanceDate:null, checkIn:null, checkOut:null, attendanceLog:[]},
+        {id:2, name:'Sardor Mahmudov', role:'Santexnik', phone:'+998902223344', salary:3500000, hireDate:'2023-06-10', attendanceDate:null, checkIn:null, checkOut:null, attendanceLog:[]},
+        {id:3, name:'Dilnoza Karimova', role:'Kassir', phone:'+998903334455', salary:2200000, hireDate:'2024-03-01', attendanceDate:null, checkIn:null, checkOut:null, attendanceLog:[]},
+        {id:4, name:'Jahongir Rahimov', role:'Yuk tashuvchi', phone:'+998904445566', salary:2000000, hireDate:'2023-11-20', attendanceDate:null, checkIn:null, checkOut:null, attendanceLog:[]},
+    ],
+    campaigns: [
+        {id:1, name:'Yozgi chegirma', type:'chegirma', content:'Barcha kranlarga 15% chegirma', date:'2026-07-20', status:'active'},
+        {id:2, name:'Yangi mijozlar', type:'sms', content:'Hurmatli mijoz, bizda yangi kollektorlar keldi!', date:'2026-07-22', status:'sent'},
+    ],
+    debtPayments: []
+};
+
+function resetDemoData() {
+    if(!confirm('Diqqat! Joriy barcha ma\'lumotlar (sotuvlar, mijozlar, mahsulotlar) o\'chib, demo ma\'lumotlar bilan almashtiriladi. Bu amalni orqaga qaytarib bo\'lmaydi. Davom etasizmi?')) return;
+    localStorage.setItem('santexDB', JSON.stringify(defaultData));
+    db = JSON.parse(JSON.stringify(defaultData));
+    saveDB();
+    showToast('Demo ma\'lumotlar tiklandi! Endi "Kirish" tugmasini bosing.', 'success');
+}
+
+// ==================== CLOUD SYNC (Supabase) ====================
+const SUPABASE_URL = 'https://bnjfhjxknjfwwkweqeui.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_teQ-8JVb2PcC2Q6cz8pF6Q_p8J-HNXs';
+const CLOUD_ROW_ID = 'santex-express';
+let sb = null;
+try { sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY); } catch(e) { console.warn('Supabase init failed', e); }
+
+function setSyncStatus(status) {
+    const el = document.getElementById('syncStatus');
+    if(!el) return;
+    const map = {
+        syncing: '<i class="fas fa-circle-notch fa-spin text-amber-400"></i> Saqlanmoqda...',
+        synced: '<i class="fas fa-check-circle text-emerald-400"></i> Bulutga saqlandi',
+        offline: '<i class="fas fa-plug-circle-xmark text-slate-500"></i> Oflayn (lokal)',
+        error: '<i class="fas fa-triangle-exclamation text-red-400"></i> Sinxronlanmadi',
+        loading: '<i class="fas fa-circle-notch fa-spin text-cyan-400"></i> Yuklanmoqda...'
+    };
+    el.innerHTML = map[status] || '';
+}
+
+function normalizeDB(loaded) {
+    if (loaded.employees) {
+        loaded.employees.forEach(e => {
+            if (e.attendanceDate === undefined) e.attendanceDate = null;
+            if (e.checkIn === undefined) e.checkIn = null;
+            if (e.checkOut === undefined) e.checkOut = null;
+            if (e.attendanceLog === undefined) e.attendanceLog = [];
+            delete e.present;
+        });
+    }
+    if (loaded.debtPayments === undefined) loaded.debtPayments = [];
+    (loaded.orders||[]).forEach(o => {
+        if (o.paid === undefined) o.paid = o.payment === 'nasiya' ? 0 : o.total;
+        if (o.debtAdded === undefined) o.debtAdded = o.payment === 'nasiya' ? o.total : 0;
+    });
+    return loaded;
+}
+
+function initDB() {
+    if (!localStorage.getItem('santexDB')) {
+        localStorage.setItem('santexDB', JSON.stringify(defaultData));
+    }
+    const loaded = JSON.parse(localStorage.getItem('santexDB'));
+    return normalizeDB(loaded);
+}
+
+let cloudSyncTimer = null;
+function saveDB() {
+    localStorage.setItem('santexDB', JSON.stringify(db));
+    if(!sb) return;
+    setSyncStatus('syncing');
+    clearTimeout(cloudSyncTimer);
+    cloudSyncTimer = setTimeout(pushToCloud, 1200);
+}
+
+async function pushToCloud() {
+    if(!sb) return;
+    try {
+        const { error } = await sb.from('app_data').upsert({ id: CLOUD_ROW_ID, data: db, updated_at: new Date().toISOString() });
+        if(error) throw error;
+        setSyncStatus('synced');
+    } catch(e) {
+        console.error('Cloud push error', e);
+        const msg = (e && (e.message || e.details || e.hint || JSON.stringify(e))) || 'Nomalum xato';
+        setSyncStatus('error');
+        const el = document.getElementById('syncStatus');
+        if(el) el.title = msg;
+        showToast('Bulutga saqlashda xato: ' + msg, 'error');
+    }
+}
+
+async function pullFromCloud() {
+    if(!sb) { setSyncStatus('offline'); return false; }
+    setSyncStatus('loading');
+    try {
+        const { data, error } = await sb.from('app_data').select('data, updated_at').eq('id', CLOUD_ROW_ID).maybeSingle();
+        if(error) throw error;
+        if(data && data.data) {
+            db = normalizeDB(data.data);
+            localStorage.setItem('santexDB', JSON.stringify(db));
+            setSyncStatus('synced');
+            return true;
+        } else {
+            // Bulutda hali ma'lumot yo'q - lokal ma'lumotni birinchi marta yuklaymiz
+            await pushToCloud();
+        }
+    } catch(e) {
+        console.error('Cloud pull error', e);
+        setSyncStatus('error');
+        const msg = (e && (e.message || e.details || e.hint || JSON.stringify(e))) || 'Nomalum xato';
+        showToast('Bulutdan yuklashda xato: ' + msg, 'error');
+    }
+    return false;
+}
+
+let db = initDB();
+let cart = [];
+let currentPayment = 'cash';
+let charts = {};
+
+// ==================== UTILS ====================
+function formatMoney(n) {
+    return new Intl.NumberFormat('uz-UZ').format(Math.round(n)) + ' so\'m';
+}
+const PAYMENT_LABELS = {cash:'Naqd', card:'Karta', transfer:"O'tkazma", nasiya:'Nasiya'};
+function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+function showToast(msg, type='success') {
+    const colors = { success:'bg-green-500', error:'bg-red-500', info:'bg-blue-500' };
+    const el = document.createElement('div');
+    el.className = `${colors[type]} text-white px-6 py-3 rounded-xl shadow-lg transform transition-all translate-y-10 opacity-0 flex items-center gap-2 max-w-[90vw]`;
+    el.innerHTML = `<i class="fas ${type==='success'?'fa-check-circle':type==='error'?'fa-exclamation-circle':'fa-info-circle'}"></i><span class="break-words">${escapeHtml(msg)}</span>`;
+    document.getElementById('toastContainer').appendChild(el);
+    setTimeout(() => { el.classList.remove('translate-y-10','opacity-0'); }, 10);
+    const duration = type==='error' ? 8000 : 3000;
+    setTimeout(() => { el.classList.add('translate-y-10','opacity-0'); setTimeout(()=>el.remove(),300); }, duration);
+}
+function openModal(html) {
+    const overlay = document.getElementById('modalOverlay');
+    const content = document.getElementById('modalContent');
+    content.innerHTML = html;
+    overlay.classList.remove('hidden');
+    setTimeout(() => { content.classList.remove('scale-95','opacity-0'); content.classList.add('scale-100','opacity-100'); }, 10);
+}
+function closeModal() {
+    const overlay = document.getElementById('modalOverlay');
+    const content = document.getElementById('modalContent');
+    content.classList.remove('scale-100','opacity-100');
+    content.classList.add('scale-95','opacity-0');
+    setTimeout(() => overlay.classList.add('hidden'), 200);
+}
+document.getElementById('modalOverlay').addEventListener('click', (e) => { if(e.target.id==='modalOverlay') closeModal(); });
+
+// ==================== BACKUP / RESTORE ====================
+function exportBackup() {
+    const blob = new Blob([JSON.stringify(db, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'santex-zaxira-' + new Date().toISOString().split('T')[0] + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Zaxira nusxa yuklab olindi!');
+}
+function importBackup(event) {
+    const file = event.target.files[0];
+    if(!file) return;
+    if(!confirm('Joriy ma\'lumotlar zaxiradagi ma\'lumotlar bilan to\'liq almashtiriladi. Davom etasizmi?')) { event.target.value=''; return; }
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const imported = JSON.parse(e.target.result);
+            if(!imported.products || !imported.customers) { showToast('Fayl noto\'g\'ri formatda!', 'error'); return; }
+            db = imported;
+            saveDB();
+            showToast('Ma\'lumotlar zaxiradan tiklandi!');
+            renderDashboard();
+            generateReport();
+        } catch(err) {
+            showToast('Faylni o\'qib bo\'lmadi!', 'error');
+        }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+}
+
+// ==================== AUTH ====================
+function doLogin() {
+    const u = document.getElementById('loginUser').value.trim();
+    const p = document.getElementById('loginPass').value;
+    if(!u || !p) { showToast('Login va parolni kiriting!', 'error'); return; }
+    const user = db.users.find(x => x.username === u && x.password === p);
+    if (user) {
+        document.getElementById('loginPage').classList.add('hidden');
+        document.getElementById('app').classList.remove('hidden');
+        document.getElementById('app').classList.add('flex');
+        document.getElementById('todayDate').textContent = new Date().toLocaleDateString('uz-UZ', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
+        initApp();
+        showToast('Xush kelibsiz, ' + user.name + '!');
+    } else {
+        showToast('Login yoki parol noto\'g\'ri!', 'error');
+    }
+}
+function logout() { location.reload(); }
+
+// ==================== NAVIGATION ====================
+function navTo(page) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page-'+page).classList.add('active');
+    document.querySelectorAll('.nav-btn').forEach(b => {
+        if(b.dataset.page===page) { b.classList.add('bg-slate-800','text-white'); b.classList.remove('text-slate-300'); }
+        else { b.classList.remove('bg-slate-800','text-white'); b.classList.add('text-slate-300'); }
+    });
+    if(page==='dashboard') renderDashboard();
+    if(page==='pos') initPOS();
+    if(page==='inventory') renderInventory();
+    if(page==='crm') renderCRM();
+    if(page==='marketing') renderMarketing();
+    if(page==='employees') renderEmployees();
+    if(page==='reports') initReports();
+    if(window.innerWidth < 768) document.getElementById('sidebar').classList.add('-translate-x-full');
+}
+function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('-translate-x-full');
+}
+
+function initApp() {
+    renderDashboard();
+}
+
+// ==================== DASHBOARD ====================
+function renderDashboard() {
+    const today = new Date().toISOString().split('T')[0];
+    const todayOrders = db.orders.filter(o => o.date.startsWith(today));
+    const todaySales = todayOrders.reduce((s,o)=>s+o.total,0);
+    const lowStock = db.products.filter(p => p.stock <= p.minStock);
+    const debtCustomers = db.customers.filter(c => c.debt > 0);
+    const totalDebt = debtCustomers.reduce((s,c)=>s+c.debt,0);
+
+    document.getElementById('dashTodaySales').textContent = formatMoney(todaySales);
+    document.getElementById('dashTotalProducts').textContent = db.products.length;
+    document.getElementById('dashLowStock').textContent = lowStock.length + ' ta kam qoldi';
+    document.getElementById('dashTotalCustomers').textContent = db.customers.length;
+    document.getElementById('dashTotalDebt').textContent = formatMoney(totalDebt);
+    document.getElementById('dashDebtCount').textContent = debtCustomers.length + ' ta mijoz';
+
+    const badge = document.getElementById('lowStockBadge');
+    if(lowStock.length > 0) { badge.textContent = lowStock.length; badge.classList.remove('hidden'); }
+    else badge.classList.add('hidden');
+
+    document.getElementById('lowStockList').innerHTML = lowStock.slice(0,5).map(p=>`
+        <div class="flex justify-between items-center p-3 bg-red-50 rounded-xl low-stock">
+            <div><p class="font-medium text-slate-800 text-sm">${escapeHtml(p.name)}</p><p class="text-xs text-slate-500">${escapeHtml(p.category)}</p></div>
+            <span class="text-red-600 font-bold text-sm">${p.stock} dona</span>
+        </div>
+    `).join('') || '<p class="text-slate-400 text-sm">Barcha mahsulotlar yetarli</p>';
+
+    const recent = [...db.orders].sort((a,b)=>b.id-a.id).slice(0,5);
+    document.getElementById('recentOrdersTable').innerHTML = recent.map(o=>{
+        const c = db.customers.find(x=>x.id==o.customerId);
+        return `<tr class="border-b border-slate-50"><td class="py-2">#${o.id.toString().slice(-4)}</td><td class="py-2">${c?escapeHtml(c.name):'Noma\'lum'}</td><td class="py-2 font-medium">${formatMoney(o.total)}</td><td class="py-2 text-slate-400 text-xs">${o.date.slice(11,16)}</td><td class="py-2 text-center"><button onclick="showReceipt(db.orders.find(x=>x.id===${o.id}))" class="text-cyan-600 hover:text-cyan-800"><i class="fas fa-receipt"></i></button></td></tr>`;
+    }).join('') || '<tr><td colspan="4" class="py-4 text-center text-slate-400">Hali sotuv yo\'q</td></tr>';
+
+    renderCharts();
+}
+
+function renderCharts() {
+    const ctx1 = document.getElementById('salesChart');
+    const ctx2 = document.getElementById('categoryChart');
+    if(!ctx1 || !ctx2) return;
+    if(charts.sales) charts.sales.destroy();
+    if(charts.cat) charts.cat.destroy();
+
+    const days = []; const sales = [];
+    for(let i=6; i>=0; i--) {
+        const d = new Date(); d.setDate(d.getDate()-i);
+        const ds = d.toISOString().split('T')[0];
+        days.push(d.toLocaleDateString('uz-UZ',{day:'numeric', month:'short'}));
+        sales.push(db.orders.filter(o=>o.date.startsWith(ds)).reduce((s,o)=>s+o.total,0));
+    }
+    charts.sales = new Chart(ctx1, {
+        type: 'line',
+        data: { labels: days, datasets: [{ label:'Sotuv', data:sales, borderColor:'#0891b2', backgroundColor:'rgba(8,145,178,0.1)', fill:true, tension:0.4, pointRadius:4 }] },
+        options: { responsive:true, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true, grid:{color:'#f1f5f9'}}, x:{grid:{display:false}}} }
+    });
+
+    const catData = {};
+    db.orders.forEach(o => o.items.forEach(i => {
+        const p = db.products.find(x=>x.id==i.productId);
+        if(p) catData[p.category] = (catData[p.category]||0) + (i.price*i.qty);
+    }));
+    charts.cat = new Chart(ctx2, {
+        type: 'doughnut',
+        data: { labels: Object.keys(catData), datasets: [{ data: Object.values(catData), backgroundColor:['#0891b2','#3b82f6','#6366f1','#8b5cf6','#ec4899','#f59e0b','#10b981','#64748b'] }] },
+        options: { responsive:true, plugins:{legend:{position:'bottom', labels:{boxWidth:12, font:{size:11}}}}, cutout:'70%' }
+    });
+}
+
+// ==================== POS ====================
+function initPOS() {
+    const catSelect = document.getElementById('posCategory');
+    catSelect.innerHTML = '<option value="">Barcha kategoriyalar</option>' + db.categories.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+    const custSelect = document.getElementById('cartCustomer');
+    custSelect.innerHTML = '<option value="">Oddiy mijoz</option>' + db.customers.map(c=>`<option value="${c.id}">${escapeHtml(c.name)} (${escapeHtml(c.phone)})</option>`).join('');
+    filterPosProducts();
+}
+
+function filterPosProducts() {
+    const search = document.getElementById('posSearch').value.toLowerCase();
+    const cat = document.getElementById('posCategory').value;
+    const filtered = db.products.filter(p => {
+        const matchSearch = p.name.toLowerCase().includes(search) || p.barcode.includes(search);
+        const matchCat = !cat || p.category === cat;
+        return matchSearch && matchCat;
+    });
+    const countEl = document.getElementById('posResultCount');
+    if(countEl) countEl.textContent = filtered.length ? `${filtered.length} ta mahsulot` : '';
+    if(filtered.length === 0) {
+        document.getElementById('posProducts').innerHTML = `
+            <div class="col-span-full flex flex-col items-center justify-center text-center text-slate-400 py-16">
+                <i class="fas fa-box-open text-3xl mb-2 opacity-40"></i>
+                <span>Mahsulot topilmadi</span>
+            </div>`;
+        return;
+    }
+    document.getElementById('posProducts').innerHTML = filtered.map(p => {
+        const low = p.stock <= p.minStock;
+        return `
+        <div onclick="addToCart(${p.id})" class="product-card bg-white rounded-2xl shadow-sm border ${low?'border-red-200':'border-slate-100'} overflow-hidden flex flex-col select-none h-[168px]">
+            <div class="w-full h-[64px] flex-shrink-0 ${low?'bg-red-50':'bg-gradient-to-br from-cyan-50 to-blue-50'} flex items-center justify-center px-2.5 py-1.5 text-center relative">
+                ${low?'<span class="absolute top-1.5 right-1.5 bg-red-500 text-white text-[9px] font-semibold px-1.5 py-0.5 rounded-full leading-none whitespace-nowrap">Kam</span>':''}
+                <span class="font-bold text-slate-800 text-[13px] leading-snug line-clamp-2 ${low?'pr-8':''}" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</span>
+            </div>
+            <div class="p-2.5 pt-2 border-t border-slate-100 flex-1 min-h-0 flex flex-col justify-between">
+                <p class="text-[11px] text-slate-400 truncate">${escapeHtml(p.category)}</p>
+                <div>
+                    <div class="font-bold text-cyan-700 text-[15px] leading-tight whitespace-nowrap">${formatMoney(p.price)}</div>
+                    <div class="text-[11px] mt-0.5 whitespace-nowrap ${low?'text-red-500 font-semibold':'text-slate-400'}">${p.stock} dona</div>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function addToCart(pid) {
+    const p = db.products.find(x=>x.id===pid);
+    if(!p || p.stock < 1) { showToast('Mahsulot qolmagan!', 'error'); return; }
+    const existing = cart.find(c=>c.productId===pid);
+    if(existing) {
+        if(existing.qty >= p.stock) { showToast('Omborda yetarli mahsulot yo\'q!', 'error'); return; }
+        existing.qty++;
+    } else {
+        cart.push({productId:pid, name:p.name, price:p.price, qty:1, stock:p.stock});
+    }
+    renderCart();
+}
+
+function renderCart() {
+    const container = document.getElementById('cartItems');
+    const countEl = document.getElementById('cartCount');
+    if(countEl) {
+        const totalQty = cart.reduce((s,c)=>s+c.qty,0);
+        countEl.textContent = totalQty > 0 ? `(${totalQty})` : '';
+    }
+    if(cart.length===0) {
+        container.innerHTML = `
+            <div class="flex flex-col items-center justify-center text-center text-slate-400 py-12">
+                <i class="fas fa-shopping-basket text-3xl mb-2 opacity-40"></i>
+                <span>Savat bo'sh</span>
+            </div>`;
+        updateCartTotals();
+        return;
+    }
+    container.innerHTML = cart.map((c,i)=>`
+        <div class="cart-item flex justify-between items-center p-3 bg-slate-50 rounded-xl gap-2">
+            <div class="flex-1 min-w-0">
+                <p class="font-medium text-slate-800 text-sm truncate">${escapeHtml(c.name)}</p>
+                <p class="text-xs text-slate-500 mt-0.5">${formatMoney(c.price)} x ${c.qty}</p>
+            </div>
+            <div class="flex items-center gap-1.5 flex-shrink-0">
+                <button onclick="changeQty(${i},-1)" class="w-9 h-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center hover:bg-slate-100 active:bg-slate-200 text-slate-600 text-base"><i class="fas fa-minus text-xs"></i></button>
+                <span class="w-7 text-center font-bold text-base">${c.qty}</span>
+                <button onclick="changeQty(${i},1)" class="w-9 h-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center hover:bg-slate-100 active:bg-slate-200 text-slate-600 text-base"><i class="fas fa-plus text-xs"></i></button>
+                <button onclick="removeFromCart(${i})" class="w-9 h-9 rounded-lg bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-100 active:bg-red-200 ml-1"><i class="fas fa-times text-sm"></i></button>
+            </div>
+        </div>
+    `).join('');
+    updateCartTotals();
+}
+
+function changeQty(i, delta) {
+    cart[i].qty += delta;
+    if(cart[i].qty <= 0) cart.splice(i,1);
+    else if(cart[i].qty > cart[i].stock) { cart[i].qty = cart[i].stock; showToast('Omborda buncha yo\'q!', 'error'); }
+    renderCart();
+}
+function removeFromCart(i) { cart.splice(i,1); renderCart(); }
+function clearCart() { cart = []; renderCart(); }
+
+function updateCartTotals() {
+    const subtotal = cart.reduce((s,c)=>s+(c.price*c.qty),0);
+    let discount = parseInt(document.getElementById('cartDiscount').value)||0;
+    if(discount < 0) { discount = 0; document.getElementById('cartDiscount').value = 0; }
+    const total = Math.max(0, subtotal - discount);
+    document.getElementById('cartSubtotal').textContent = formatMoney(subtotal);
+    document.getElementById('cartTotal').textContent = formatMoney(total);
+}
+
+function setPayment(type) {
+    currentPayment = type;
+    document.querySelectorAll('.pay-btn').forEach(b => {
+        if(b.dataset.pay===type) { b.classList.add('bg-cyan-600','text-white','border-cyan-600'); b.classList.remove('bg-white','text-slate-600','border-slate-200'); }
+        else { b.classList.remove('bg-cyan-600','text-white','border-cyan-600'); b.classList.add('bg-white','text-slate-600','border-slate-200'); }
+    });
+    document.getElementById('nasiyaPaidWrap').classList.toggle('hidden', type !== 'nasiya');
+}
+
+function checkout() {
+    if(cart.length===0) { showToast('Savat bo\'sh!', 'error'); return; }
+
+    // Sotishdan oldin omborda yetarli qoldiq borligini qayta tekshiramiz
+    for(let c of cart) {
+        const p = db.products.find(x=>x.id===c.productId);
+        if(!p || p.stock < c.qty) {
+            showToast(`"${p?p.name:c.name}" mahsulotidan omborda yetarli emas!`, 'error');
+            return;
+        }
+    }
+
+    const customerId = document.getElementById('cartCustomer').value;
+    if(currentPayment === 'nasiya' && !customerId) {
+        showToast('Nasiya savdo uchun mijozni tanlash shart!', 'error');
+        return;
+    }
+
+    let discount = parseInt(document.getElementById('cartDiscount').value)||0;
+    if(discount < 0) discount = 0;
+    const subtotal = cart.reduce((s,c)=>s+(c.price*c.qty),0);
+    const total = Math.max(0, subtotal - discount);
+
+    let paidNow = total;
+    let debtAdded = 0;
+    if(currentPayment === 'nasiya') {
+        paidNow = parseInt(document.getElementById('nasiyaPaid').value)||0;
+        if(paidNow < 0) paidNow = 0;
+        if(paidNow > total) paidNow = total;
+        debtAdded = total - paidNow;
+    }
+
+    for(let c of cart) {
+        const p = db.products.find(x=>x.id===c.productId);
+        if(p) p.stock -= c.qty;
+    }
+
+    if(customerId) {
+        const cust = db.customers.find(x=>x.id==customerId);
+        if(cust) {
+            cust.totalPurchases += total;
+            if(debtAdded > 0) cust.debt += debtAdded;
+        }
+    }
+
+    const order = {
+        id: Date.now(),
+        customerId: customerId||null,
+        items: cart.map(c=>({productId:c.productId, name:c.name, price:c.price, qty:c.qty})),
+        subtotal: total+discount,
+        discount: discount,
+        total: total,
+        payment: currentPayment,
+        paid: paidNow,
+        debtAdded: debtAdded,
+        date: new Date().toISOString()
+    };
+    db.orders.push(order);
+    saveDB();
+
+    showToast('Sotuv muvaffaqiyatli!', 'success');
+    cart = [];
+    document.getElementById('cartDiscount').value = 0;
+    document.getElementById('nasiyaPaid').value = 0;
+    setPayment('cash');
+    renderCart();
+    filterPosProducts();
+    showReceipt(order);
+}
+
+// ==================== CHEK (RECEIPT) ====================
+function buildReceiptHTML(order) {
+    const cust = order.customerId ? db.customers.find(x=>x.id==order.customerId) : null;
+    const d = new Date(order.date);
+    return `
+        <div style="text-align:center; margin-bottom:8px;">
+            <div style="font-weight:bold; font-size:16px;">SANTEX EXPRESS</div>
+            <div style="font-size:11px; color:#666;">Santexnika mollari do'koni</div>
+        </div>
+        <div style="border-top:1px dashed #999; margin:6px 0;"></div>
+        <div style="font-size:11px;">Chek: #${order.id.toString().slice(-6)}</div>
+        <div style="font-size:11px;">Sana: ${d.toLocaleDateString('uz-UZ')} ${d.toLocaleTimeString('uz-UZ',{hour:'2-digit',minute:'2-digit'})}</div>
+        ${cust ? `<div style="font-size:11px;">Mijoz: ${escapeHtml(cust.name)}</div>` : ''}
+        <div style="border-top:1px dashed #999; margin:6px 0;"></div>
+        <table style="width:100%; font-size:11px; border-collapse:collapse;">
+            ${order.items.map(i=>`
+                <tr><td colspan="2" style="padding-top:4px;">${escapeHtml(i.name)}</td></tr>
+                <tr>
+                    <td>${i.qty} x ${formatMoney(i.price)}</td>
+                    <td style="text-align:right; font-weight:bold;">${formatMoney(i.qty*i.price)}</td>
+                </tr>
+            `).join('')}
+        </table>
+        <div style="border-top:1px dashed #999; margin:6px 0;"></div>
+        <div style="display:flex; justify-content:space-between; font-size:12px;"><span>Jami:</span><span>${formatMoney(order.subtotal)}</span></div>
+        ${order.discount>0?`<div style="display:flex; justify-content:space-between; font-size:12px;"><span>Chegirma:</span><span>-${formatMoney(order.discount)}</span></div>`:''}
+        <div style="display:flex; justify-content:space-between; font-size:14px; font-weight:bold; margin-top:4px;"><span>UMUMIY:</span><span>${formatMoney(order.total)}</span></div>
+        <div style="display:flex; justify-content:space-between; font-size:11px; margin-top:4px;"><span>To'lov turi:</span><span>${PAYMENT_LABELS[order.payment]||order.payment}</span></div>
+        ${order.payment==='nasiya' ? `
+        <div style="display:flex; justify-content:space-between; font-size:11px;"><span>Hozir to'landi:</span><span>${formatMoney(order.paid||0)}</span></div>
+        <div style="display:flex; justify-content:space-between; font-size:11px; color:#dc2626; font-weight:bold;"><span>Qarzga yozildi:</span><span>${formatMoney(order.debtAdded||0)}</span></div>
+        ` : ''}
+        <div style="border-top:1px dashed #999; margin:6px 0;"></div>
+        <div style="text-align:center; font-size:11px; margin-top:8px;">Xaridingiz uchun rahmat!</div>
+    `;
+}
+
+function showReceipt(order) {
+    if(!order) { showToast('Chek topilmadi!', 'error'); return; }
+    openModal(`
+        <div class="p-6">
+            <h3 class="text-xl font-bold text-slate-800 mb-4 text-center">Chek</h3>
+            <div style="background:#fafafa; border:1px solid #e2e8f0; border-radius:12px; padding:16px;">${buildReceiptHTML(order)}</div>
+            <div class="flex gap-3 mt-5">
+                <button onclick="printReceipt(${order.id})" class="flex-1 bg-cyan-600 text-white py-2 rounded-lg hover:bg-cyan-700 transition"><i class="fas fa-print mr-1"></i> Chop etish</button>
+                <button onclick="closeModal()" class="flex-1 border border-slate-200 py-2 rounded-lg hover:bg-slate-50">Yopish</button>
+            </div>
+        </div>
+    `);
+}
+
+function printReceipt(orderId) {
+    const order = db.orders.find(o=>o.id===orderId);
+    if(!order) return;
+    document.getElementById('receiptPrintArea').innerHTML = buildReceiptHTML(order);
+    document.body.classList.add('printing-receipt');
+    window.print();
+}
+window.addEventListener('afterprint', () => { document.body.classList.remove('printing-receipt'); });
+
+// ==================== INVENTORY ====================
+function renderInventory() {
+    const search = document.getElementById('invSearch').value.toLowerCase();
+    const cat = document.getElementById('invCategory').value;
+    document.getElementById('invCategory').innerHTML = '<option value="">Barcha kategoriyalar</option>' + db.categories.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+    if(cat) document.getElementById('invCategory').value = cat;
+
+    const filtered = db.products.filter(p => {
+        return p.name.toLowerCase().includes(search) && (!cat || p.category===cat);
+    });
+
+    // Umumiy statistika (butun ombor bo'yicha, filtrsiz)
+    const saleValue = db.products.reduce((s,p)=>s+(p.price*p.stock),0);
+    const costValue = db.products.reduce((s,p)=>s+(p.cost*p.stock),0);
+    const totalUnits = db.products.reduce((s,p)=>s+p.stock,0);
+    const lowCount = db.products.filter(p=>p.stock<=p.minStock).length;
+    const statSale = document.getElementById('invStatSaleValue');
+    const statCost = document.getElementById('invStatCostValue');
+    const statCount = document.getElementById('invStatCount');
+    const statLow = document.getElementById('invStatLow');
+    if(statSale) statSale.textContent = formatMoney(saleValue);
+    if(statCost) statCost.textContent = formatMoney(costValue);
+    if(statCount) statCount.textContent = `${db.products.length} / ${totalUnits}`;
+    if(statLow) statLow.textContent = lowCount;
+    
+    document.getElementById('inventoryTable').innerHTML = filtered.map((p,i)=>`
+        <tr class="${p.stock<=p.minStock?'bg-red-50':''}">
+            <td class="py-3 px-4">${i+1}</td>
+            <td class="py-3 px-4 font-medium">${escapeHtml(p.name)}</td>
+            <td class="py-3 px-4"><span class="bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded-lg">${escapeHtml(p.category)}</span></td>
+            <td class="py-3 px-4 text-slate-500 text-xs">${escapeHtml(p.barcode)}</td>
+            <td class="py-3 px-4 text-right font-medium">${formatMoney(p.price)}</td>
+            <td class="py-3 px-4 text-right text-slate-500">${formatMoney(p.cost)}</td>
+            <td class="py-3 px-4 text-right ${p.stock<=p.minStock?'text-red-600 font-bold':'text-slate-600'}">${p.stock}</td>
+            <td class="py-3 px-4 text-center">
+                <button onclick="openProductModal(${p.id})" class="text-cyan-600 hover:text-cyan-800 mr-2"><i class="fas fa-edit"></i></button>
+                <button onclick="deleteProduct(${p.id})" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function openProductModal(editId) {
+    const p = editId ? db.products.find(x=>x.id===editId) : null;
+    openModal(`
+        <div class="p-6">
+            <h3 class="text-xl font-bold text-slate-800 mb-4">${p?'Tahrirlash':'Yangi mahsulot'}</h3>
+            <div class="space-y-3">
+                <input type="text" id="pName" value="${p?escapeHtml(p.name):''}" placeholder="Nomi" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">
+                <select id="pCategory" onchange="toggleNewCategoryInput()" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none bg-white">
+                    ${db.categories.map(c=>`<option value="${escapeHtml(c)}" ${p&&p.category===c?'selected':''}>${escapeHtml(c)}</option>`).join('')}
+                    <option value="__new__">+ Yangi kategoriya qo'shish</option>
+                </select>
+                <input type="text" id="pNewCategory" placeholder="Yangi kategoriya nomi" class="hidden w-full px-4 py-2 border border-cyan-300 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">
+                <div class="grid grid-cols-2 gap-3">
+                    <input type="number" id="pPrice" value="${p?p.price:''}" placeholder="Sotish narxi" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">
+                    <input type="number" id="pCost" value="${p?p.cost:''}" placeholder="Sotib olish narxi" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <input type="number" id="pStock" value="${p?p.stock:''}" placeholder="Qoldiq" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">
+                    <input type="number" id="pMinStock" value="${p?p.minStock:''}" placeholder="Minimal qoldiq" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">
+                </div>
+                <input type="text" id="pBarcode" value="${p?escapeHtml(p.barcode):''}" placeholder="Shtrix-kod" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">
+                <div class="flex gap-3 mt-4">
+                    <button onclick="saveProduct(${p?p.id:'null'})" class="flex-1 bg-cyan-600 text-white py-2 rounded-lg hover:bg-cyan-700 transition">Saqlash</button>
+                    <button onclick="closeModal()" class="flex-1 border border-slate-200 py-2 rounded-lg hover:bg-slate-50">Bekor qilish</button>
+                </div>
+            </div>
+        </div>
+    `);
+}
+
+function toggleNewCategoryInput() {
+    const sel = document.getElementById('pCategory');
+    const input = document.getElementById('pNewCategory');
+    if(sel.value === '__new__') { input.classList.remove('hidden'); input.focus(); }
+    else { input.classList.add('hidden'); input.value=''; }
+}
+
+function saveProduct(editId) {
+    const name = document.getElementById('pName').value.trim();
+    let category = document.getElementById('pCategory').value;
+    const price = parseInt(document.getElementById('pPrice').value)||0;
+    const cost = parseInt(document.getElementById('pCost').value)||0;
+    const stock = parseInt(document.getElementById('pStock').value)||0;
+    const minStock = parseInt(document.getElementById('pMinStock').value)||0;
+    const barcode = document.getElementById('pBarcode').value.trim();
+
+    if(!name) { showToast('Nomi kiritilishi shart!', 'error'); return; }
+
+    if(category === '__new__') {
+        const newCat = document.getElementById('pNewCategory').value.trim();
+        if(!newCat) { showToast('Yangi kategoriya nomini kiriting!', 'error'); return; }
+        if(!db.categories.includes(newCat)) db.categories.push(newCat);
+        category = newCat;
+    }
+
+    if(editId && editId!=='null') {
+        const p = db.products.find(x=>x.id===editId);
+        if(p) { Object.assign(p, {name, category, price, cost, stock, minStock, barcode}); }
+    } else {
+        const newId = Math.max(...db.products.map(x=>x.id),0)+1;
+        db.products.push({id:newId, name, category, price, cost, stock, barcode, minStock});
+    }
+    saveDB(); closeModal(); renderInventory(); showToast('Saqlandi!');
+}
+
+function deleteProduct(id) {
+    if(!confirm('Rostdan ham o\'chirmoqchimisiz?')) return;
+    db.products = db.products.filter(x=>x.id!==id);
+    saveDB(); renderInventory(); showToast('O\'chirildi!');
+}
+
+function exportInventoryCSV() {
+    let csv = 'Nomi,Kategoriya,Shtrix-kod,Narxi,Sotib olish,Qoldiq\n';
+    db.products.forEach(p=>{ csv+=`${p.name},${p.category},${p.barcode},${p.price},${p.cost},${p.stock}\n`; });
+    const blob = new Blob([csv],{type:'text/csv'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href=url; a.download='santex-ombor.csv'; a.click();
+    showToast('CSV yuklandi!');
+}
+
+function importInventoryCSV(event) {
+    const file = event.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const lines = e.target.result.split(/\r?\n/).filter(l=>l.trim().length>0);
+            if(lines.length < 2) { showToast('Fayl bo\'sh yoki noto\'g\'ri!', 'error'); event.target.value=''; return; }
+            let added = 0, updated = 0;
+            for(let i=1; i<lines.length; i++) {
+                const cols = lines[i].split(',');
+                if(cols.length < 6) continue;
+                const [name, category, barcode, price, cost, stock] = cols.map(c=>c.trim());
+                if(!name) continue;
+                const priceNum = parseInt(price)||0;
+                const costNum = parseInt(cost)||0;
+                const stockNum = parseInt(stock)||0;
+                let existing = db.products.find(p=>p.barcode && barcode && p.barcode===barcode);
+                if(!existing) existing = db.products.find(p=>p.name.toLowerCase()===name.toLowerCase());
+                if(existing) {
+                    Object.assign(existing, {name, category: category||existing.category, price: priceNum, cost: costNum, stock: stockNum});
+                    updated++;
+                } else {
+                    if(category && !db.categories.includes(category)) db.categories.push(category);
+                    const newId = Math.max(...db.products.map(x=>x.id),0)+1;
+                    db.products.push({id:newId, name, category: category||db.categories[0]||'Boshqa', price: priceNum, cost: costNum, stock: stockNum, barcode: barcode||('IMP'+newId), minStock: 5});
+                    added++;
+                }
+            }
+            saveDB(); renderInventory();
+            showToast(`Yuklandi: ${updated} yangilandi, ${added} qo'shildi!`);
+        } catch(err) {
+            showToast('Faylni o\'qib bo\'lmadi!', 'error');
+        }
+        event.target.value = '';
+    };
+    reader.readAsText(file);
+}
+
+// ==================== CRM ====================
+function renderCRM() {
+    const search = document.getElementById('crmSearch').value.toLowerCase();
+    const filtered = db.customers.filter(c=>c.name.toLowerCase().includes(search)||c.phone.includes(search));
+    
+    document.getElementById('crmTable').innerHTML = filtered.map(c=>`
+        <tr class="hover:bg-slate-50">
+            <td class="py-3 px-4">${c.id}</td>
+            <td class="py-3 px-4 font-medium">${escapeHtml(c.name)}</td>
+            <td class="py-3 px-4 text-slate-500">${escapeHtml(c.phone)}</td>
+            <td class="py-3 px-4 text-slate-500 text-xs">${escapeHtml(c.address)}</td>
+            <td class="py-3 px-4 text-right ${c.debt>0?'text-red-600 font-bold':'text-slate-600'}">${formatMoney(c.debt)}</td>
+            <td class="py-3 px-4 text-right text-slate-600">${formatMoney(c.totalPurchases)}</td>
+            <td class="py-3 px-4 text-center">
+                ${c.debt>0?`<button onclick="openDebtPaymentModal(${c.id})" class="text-green-600 hover:text-green-800 mr-2" title="To'lov qabul qilish"><i class="fas fa-money-bill-wave"></i></button>`:''}
+                <button onclick="editCustomer(${c.id})" class="text-cyan-600 hover:text-cyan-800 mr-2"><i class="fas fa-edit"></i></button>
+                <button onclick="deleteCustomer(${c.id})" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button>
+            </td>
+        </tr>
+    `).join('');
+    
+    const debtCustomers = db.customers.filter(c=>c.debt>0);
+    const totalDebt = debtCustomers.reduce((s,c)=>s+c.debt,0);
+    document.getElementById('crmTotalDebt').textContent = formatMoney(totalDebt);
+    document.getElementById('crmDebtCount').textContent = debtCustomers.length + ' ta mijoz';
+    
+    const top = [...db.customers].sort((a,b)=>b.totalPurchases-a.totalPurchases).slice(0,5);
+    document.getElementById('topCustomers').innerHTML = top.map((c,i)=>`
+        <div class="flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 text-white flex items-center justify-center text-xs font-bold">${i+1}</div>
+                <div><p class="font-medium text-sm text-slate-800">${escapeHtml(c.name)}</p><p class="text-xs text-slate-400">${escapeHtml(c.phone)}</p></div>
+            </div>
+            <span class="font-bold text-sm text-slate-700">${formatMoney(c.totalPurchases)}</span>
+        </div>
+    `).join('');
+}
+
+function openCustomerModal(editId) {
+    const c = editId ? db.customers.find(x=>x.id===editId) : null;
+    openModal(`
+        <div class="p-6">
+            <h3 class="text-xl font-bold text-slate-800 mb-4">${c?'Mijozni tahrirlash':'Yangi mijoz'}</h3>
+            <div class="space-y-3">
+                <input type="text" id="cName" value="${c?escapeHtml(c.name):''}" placeholder="FIO" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">
+                <input type="text" id="cPhone" value="${c?escapeHtml(c.phone):''}" placeholder="Telefon" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">
+                <input type="text" id="cAddress" value="${c?escapeHtml(c.address):''}" placeholder="Manzil" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">
+                <input type="number" id="cDebt" value="${c?c.debt:0}" placeholder="Qarz" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">
+                <div class="flex gap-3 mt-4">
+                    <button onclick="saveCustomer(${c?c.id:'null'})" class="flex-1 bg-cyan-600 text-white py-2 rounded-lg hover:bg-cyan-700 transition">Saqlash</button>
+                    <button onclick="closeModal()" class="flex-1 border border-slate-200 py-2 rounded-lg hover:bg-slate-50">Bekor qilish</button>
+                </div>
+            </div>
+        </div>
+    `);
+}
+
+    function saveCustomer(editId) {
+    const name = document.getElementById('cName').value.trim();
+    const phone = document.getElementById('cPhone').value.trim();
+    const address = document.getElementById('cAddress').value.trim();
+    const debt = parseInt(document.getElementById('cDebt').value)||0;
+    
+    if(!name) { showToast('FIO kiritilishi shart!', 'error'); return; }
+    
+    if(editId && editId!=='null') {
+        const c = db.customers.find(x=>x.id===editId);
+        if(c) { Object.assign(c, {name, phone, address, debt}); }
+    } else {
+        const newId = Math.max(...db.customers.map(x=>x.id),0)+1;
+        db.customers.push({id:newId, name, phone, address, debt, totalPurchases:0});
+    }
+    saveDB(); closeModal(); renderCRM(); showToast('Mijoz saqlandi!');
+}
+
+function editCustomer(id) { openCustomerModal(id); }
+
+function deleteCustomer(id) {
+    if(!confirm('Rostdan ham o\'chirmoqchimisiz?')) return;
+    db.customers = db.customers.filter(x=>x.id!==id);
+    saveDB(); renderCRM(); showToast('Mijoz o\'chirildi!');
+}
+
+function openDebtPaymentModal(id) {
+    const c = db.customers.find(x=>x.id===id);
+    if(!c) return;
+    openModal(`
+        <div class="p-6">
+            <h3 class="text-xl font-bold text-slate-800 mb-1">To'lov qabul qilish</h3>
+            <p class="text-sm text-slate-500 mb-4">${escapeHtml(c.name)} — joriy qarz: <span class="font-bold text-red-600">${formatMoney(c.debt)}</span></p>
+            <input type="number" id="debtPayAmount" placeholder="To'lov summasi" min="1" max="${c.debt}" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none mb-4">
+            <div class="flex gap-3">
+                <button onclick="payDebt(${c.id})" class="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition">To'lovni qabul qilish</button>
+                <button onclick="closeModal()" class="flex-1 border border-slate-200 py-2 rounded-lg hover:bg-slate-50">Bekor qilish</button>
+            </div>
+        </div>
+    `);
+}
+
+function payDebt(id) {
+    const c = db.customers.find(x=>x.id===id);
+    if(!c) return;
+    let amount = parseInt(document.getElementById('debtPayAmount').value)||0;
+    if(amount <= 0) { showToast('To\'g\'ri summa kiriting!', 'error'); return; }
+    if(amount > c.debt) amount = c.debt;
+    c.debt -= amount;
+    db.debtPayments = db.debtPayments || [];
+    db.debtPayments.push({id:Date.now(), customerId:id, amount, date:new Date().toISOString()});
+    saveDB();
+    closeModal();
+    renderCRM();
+    showToast(`${formatMoney(amount)} to'lov qabul qilindi!`);
+}
+
+// ==================== MARKETING ====================
+function renderMarketing() {
+    document.getElementById('mktActive').textContent = db.campaigns.filter(c=>c.status==='active').length;
+    document.getElementById('mktSMS').textContent = db.campaigns.filter(c=>c.type==='sms').length;
+    document.getElementById('mktDiscounts').textContent = db.campaigns.filter(c=>c.type==='chegirma').length;
+    
+    document.getElementById('marketingTable').innerHTML = db.campaigns.map(c=>`
+        <tr class="hover:bg-slate-50">
+            <td class="py-3 px-4 font-medium">${escapeHtml(c.name)}</td>
+            <td class="py-3 px-4"><span class="bg-${c.type==='sms'?'blue':c.type==='chegirma'?'green':'purple'}-100 text-${c.type==='sms'?'blue':c.type==='chegirma'?'green':'purple'}-700 text-xs px-2 py-1 rounded-lg">${escapeHtml(c.type)}</span></td>
+            <td class="py-3 px-4 text-slate-600 text-sm">${escapeHtml(c.content)}</td>
+            <td class="py-3 px-4 text-slate-500 text-xs">${escapeHtml(c.date)}</td>
+            <td class="py-3 px-4 text-center"><span class="bg-${c.status==='active'?'green':c.status==='sent'?'blue':'slate'}-100 text-${c.status==='active'?'green':c.status==='sent'?'blue':'slate'}-700 text-xs px-2 py-1 rounded-full">${escapeHtml(c.status)}</span></td>
+            <td class="py-3 px-4 text-center">
+                <button onclick="deleteCampaign(${c.id})" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function openCampaignModal() {
+    openModal(`
+        <div class="p-6">
+            <h3 class="text-xl font-bold text-slate-800 mb-4">Yangi kampaniya</h3>
+            <div class="space-y-3">
+                <input type="text" id="campName" placeholder="Kampaniya nomi" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">
+                <select id="campType" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none bg-white">
+                    <option value="sms">SMS xabar</option>
+                    <option value="chegirma">Chegirma</option>
+                    <option value="boshqa">Boshqa</option>
+                </select>
+                <textarea id="campContent" placeholder="Mazmuni" rows="3" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none resize-none"></textarea>
+                <input type="date" id="campDate" value="${new Date().toISOString().split('T')[0]}" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">
+                <div class="flex gap-3 mt-4">
+                    <button onclick="saveCampaign()" class="flex-1 bg-cyan-600 text-white py-2 rounded-lg hover:bg-cyan-700 transition">Saqlash</button>
+                    <button onclick="closeModal()" class="flex-1 border border-slate-200 py-2 rounded-lg hover:bg-slate-50">Bekor qilish</button>
+                </div>
+            </div>
+        </div>
+    `);
+}
+
+function saveCampaign() {
+    const name = document.getElementById('campName').value.trim();
+    const type = document.getElementById('campType').value;
+    const content = document.getElementById('campContent').value.trim();
+    const date = document.getElementById('campDate').value;
+    
+    if(!name || !content) { showToast('Barcha maydonlarni to\'ldiring!', 'error'); return; }
+    
+    const newId = Math.max(...db.campaigns.map(x=>x.id),0)+1;
+    db.campaigns.push({id:newId, name, type, content, date, status:'active'});
+    saveDB(); closeModal(); renderMarketing(); showToast('Kampaniya yaratildi!');
+}
+
+function deleteCampaign(id) {
+    if(!confirm('Rostdan ham o\'chirmoqchimisiz?')) return;
+    db.campaigns = db.campaigns.filter(x=>x.id!==id);
+    saveDB(); renderMarketing(); showToast('O\'chirildi!');
+}
+
+// ==================== EMPLOYEES ====================
+function getTimeNow() {
+    const d = new Date();
+    return d.toLocaleTimeString('uz-UZ', {hour:'2-digit', minute:'2-digit'});
+}
+
+// Har bir xodim uchun "bugun"gi davomat yozuvini tekshiradi; agar sana o'zgargan bo'lsa
+// avvalgi kunni tarixga (attendanceLog) yozib, checkIn/checkOut'ni tozalaydi.
+function ensureAttendanceToday(e) {
+    const today = new Date().toISOString().split('T')[0];
+    if (e.attendanceDate !== today) {
+        if (e.attendanceDate && (e.checkIn || e.checkOut)) {
+            e.attendanceLog = e.attendanceLog || [];
+            e.attendanceLog.push({date: e.attendanceDate, checkIn: e.checkIn, checkOut: e.checkOut});
+            if (e.attendanceLog.length > 60) e.attendanceLog.shift();
+        }
+        e.attendanceDate = today;
+        e.checkIn = null;
+        e.checkOut = null;
+    }
+}
+
+function renderEmployees() {
+    db.employees.forEach(ensureAttendanceToday);
+    saveDB();
+
+    document.getElementById('employeeTable').innerHTML = db.employees.map((e,i)=>`
+        <tr class="hover:bg-slate-50">
+            <td class="py-3 px-4">${i+1}</td>
+            <td class="py-3 px-4 font-medium">${escapeHtml(e.name)}</td>
+            <td class="py-3 px-4 text-slate-600">${escapeHtml(e.role)}</td>
+            <td class="py-3 px-4 text-slate-500 text-sm">${escapeHtml(e.phone)}</td>
+            <td class="py-3 px-4 text-right font-medium">${formatMoney(e.salary)}</td>
+            <td class="py-3 px-4 text-center">
+                <div class="flex items-center justify-center gap-1.5">
+                    <button onclick="checkInEmployee(${e.id})" ${e.checkIn?'disabled':''} class="px-2 py-1 rounded-lg text-xs font-medium transition ${e.checkIn?'bg-green-100 text-green-700 cursor-default':'bg-slate-100 text-slate-600 hover:bg-green-100 hover:text-green-700'}">
+                        <i class="fas fa-sign-in-alt mr-1"></i>${e.checkIn ? e.checkIn : 'Keldi'}
+                    </button>
+                    <button onclick="checkOutEmployee(${e.id})" ${(!e.checkIn || e.checkOut)?'disabled':''} class="px-2 py-1 rounded-lg text-xs font-medium transition ${e.checkOut?'bg-red-100 text-red-700 cursor-default':(e.checkIn?'bg-slate-100 text-slate-600 hover:bg-red-100 hover:text-red-700':'bg-slate-50 text-slate-300 cursor-not-allowed')}">
+                        <i class="fas fa-sign-out-alt mr-1"></i>${e.checkOut ? e.checkOut : 'Ketdi'}
+                    </button>
+                </div>
+            </td>
+            <td class="py-3 px-4 text-center">
+                <button onclick="openEmployeeModal(${e.id})" class="text-cyan-600 hover:text-cyan-800 mr-2"><i class="fas fa-edit"></i></button>
+                <button onclick="deleteEmployee(${e.id})" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button>
+            </td>
+        </tr>
+    `).join('');
+    
+    const present = db.employees.filter(e=>e.checkIn).length;
+    const total = db.employees.length;
+    const fund = db.employees.reduce((s,e)=>s+e.salary,0);
+    
+    document.getElementById('empPresent').innerHTML = `${present}<span class="text-lg text-slate-400">/<span id="empTotal">${total}</span></span>`;
+    document.getElementById('empProgress').style.width = total>0 ? (present/total*100)+'%' : '0%';
+    document.getElementById('empSalaryFund').textContent = formatMoney(fund);
+}
+
+function checkInEmployee(id) {
+    const e = db.employees.find(x=>x.id===id);
+    if(!e) return;
+    ensureAttendanceToday(e);
+    if(e.checkIn) return;
+    e.checkIn = getTimeNow();
+    saveDB(); renderEmployees();
+    showToast(escapeHtml(e.name) + ' ish boshladi: ' + e.checkIn);
+}
+
+function checkOutEmployee(id) {
+    const e = db.employees.find(x=>x.id===id);
+    if(!e) return;
+    ensureAttendanceToday(e);
+    if(!e.checkIn) { showToast('Avval "Keldi" tugmasini bosing!', 'error'); return; }
+    if(e.checkOut) return;
+    e.checkOut = getTimeNow();
+    saveDB(); renderEmployees();
+    showToast(escapeHtml(e.name) + ' ishni tugatdi: ' + e.checkOut);
+}
+
+function openEmployeeModal(editId) {
+    const e = editId ? db.employees.find(x=>x.id===editId) : null;
+    openModal(`
+        <div class="p-6">
+            <h3 class="text-xl font-bold text-slate-800 mb-4">${e?'Xodimni tahrirlash':'Yangi xodim'}</h3>
+            <div class="space-y-3">
+                <input type="text" id="eName" value="${e?escapeHtml(e.name):''}" placeholder="FIO" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">
+                <input type="text" id="eRole" value="${e?escapeHtml(e.role):''}" placeholder="Lavozim" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">
+                <input type="text" id="ePhone" value="${e?escapeHtml(e.phone):''}" placeholder="Telefon" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">
+                <input type="number" id="eSalary" value="${e?e.salary:''}" placeholder="Oylik" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">
+                <input type="date" id="eHireDate" value="${e?e.hireDate:''}" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">
+                <div class="flex gap-3 mt-4">
+                    <button onclick="saveEmployee(${e?e.id:'null'})" class="flex-1 bg-cyan-600 text-white py-2 rounded-lg hover:bg-cyan-700 transition">Saqlash</button>
+                    <button onclick="closeModal()" class="flex-1 border border-slate-200 py-2 rounded-lg hover:bg-slate-50">Bekor qilish</button>
+                </div>
+            </div>
+        </div>
+    `);
+}
+
+function saveEmployee(editId) {
+    const name = document.getElementById('eName').value.trim();
+    const role = document.getElementById('eRole').value.trim();
+    const phone = document.getElementById('ePhone').value.trim();
+    const salary = parseInt(document.getElementById('eSalary').value)||0;
+    const hireDate = document.getElementById('eHireDate').value;
+    
+    if(!name || !role) { showToast('FIO va lavozim kiritilishi shart!', 'error'); return; }
+    
+    if(editId && editId!=='null') {
+        const e = db.employees.find(x=>x.id===editId);
+        if(e) { Object.assign(e, {name, role, phone, salary, hireDate}); }
+    } else {
+        const newId = Math.max(...db.employees.map(x=>x.id),0)+1;
+        db.employees.push({id:newId, name, role, phone, salary, hireDate, attendanceDate:null, checkIn:null, checkOut:null, attendanceLog:[]});
+    }
+    saveDB(); closeModal(); renderEmployees(); showToast('Xodim saqlandi!');
+}
+
+function deleteEmployee(id) {
+    if(!confirm('Rostdan ham o\'chirmoqchimisiz?')) return;
+    db.employees = db.employees.filter(x=>x.id!==id);
+    saveDB(); renderEmployees(); showToast('Xodim o\'chirildi!');
+}
+
+// ==================== REPORTS ====================
+function initReports() {
+    const today = new Date().toISOString().split('T')[0];
+    const firstOfMonth = today.slice(0,8) + '01';
+    document.getElementById('repFrom').value = firstOfMonth;
+    document.getElementById('repTo').value = today;
+    generateReport();
+}
+
+function generateReport() {
+    const from = document.getElementById('repFrom').value;
+    const to = document.getElementById('repTo').value;
+    const type = document.getElementById('repType').value;
+    
+    if(!from || !to) { showToast('Sanalarni tanlang!', 'error'); return; }
+    
+    const fromDate = new Date(from); const toDate = new Date(to);
+    toDate.setHours(23,59,59,999);
+    
+    const filteredOrders = db.orders.filter(o => {
+        const d = new Date(o.date);
+        return d >= fromDate && d <= toDate;
+    });
+    
+    let html = '';
+    
+    if(type==='sales') {
+        const total = filteredOrders.reduce((s,o)=>s+o.total,0);
+        const count = filteredOrders.length;
+        const avg = count>0 ? total/count : 0;
+        
+        html = `
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div class="bg-cyan-50 p-4 rounded-xl"><p class="text-slate-500 text-sm">Jami sotuvlar</p><p class="text-2xl font-bold text-cyan-700">${formatMoney(total)}</p></div>
+                <div class="bg-blue-50 p-4 rounded-xl"><p class="text-slate-500 text-sm">Buyurtmalar soni</p><p class="text-2xl font-bold text-blue-700">${count}</p></div>
+                <div class="bg-purple-50 p-4 rounded-xl"><p class="text-slate-500 text-sm">O'rtacha chek</p><p class="text-2xl font-bold text-purple-700">${formatMoney(avg)}</p></div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-slate-50 text-slate-500"><tr><th class="text-left py-3 px-4">ID</th><th class="text-left py-3 px-4">Mijoz</th><th class="text-right py-3 px-4">Summa</th><th class="text-center py-3 px-4">To'lov</th><th class="text-left py-3 px-4">Sana</th><th class="text-center py-3 px-4">Chek</th></tr></thead>
+                    <tbody class="divide-y divide-slate-100">
+                        ${filteredOrders.map(o=>{
+                            const c = db.customers.find(x=>x.id==o.customerId);
+                            return `<tr><td class="py-3 px-4">#${o.id.toString().slice(-6)}</td><td class="py-3 px-4">${c?escapeHtml(c.name):'Noma\'lum'}</td><td class="py-3 px-4 text-right font-medium">${formatMoney(o.total)}</td><td class="py-3 px-4 text-center"><span class="bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded">${PAYMENT_LABELS[o.payment]||o.payment}</span>${o.debtAdded>0?`<div class="text-[10px] text-red-500 mt-1">Qarz: ${formatMoney(o.debtAdded)}</div>`:''}</td><td class="py-3 px-4 text-slate-500 text-xs">${o.date.slice(0,10)} ${o.date.slice(11,16)}</td><td class="py-3 px-4 text-center"><button onclick="showReceipt(db.orders.find(x=>x.id===${o.id}))" class="text-cyan-600 hover:text-cyan-800"><i class="fas fa-receipt"></i></button></td></tr>`;
+                        }).join('') || '<tr><td colspan="6" class="py-8 text-center text-slate-400">Ma\'lumot topilmadi</td></tr>'}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    } else if(type==='products') {
+        const productSales = {};
+        filteredOrders.forEach(o => o.items.forEach(i => {
+            productSales[i.name] = (productSales[i.name]||0) + i.qty;
+        }));
+        const sorted = Object.entries(productSales).sort((a,b)=>b[1]-a[1]);
+        
+        html = `
+            <h3 class="font-bold text-slate-800 mb-4">Eng ko'p sotilgan mahsulotlar</h3>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-slate-50 text-slate-500"><tr><th class="text-left py-3 px-4">#</th><th class="text-left py-3 px-4">Mahsulot</th><th class="text-right py-3 px-4">Sotilgan (dona)</th></tr></thead>
+                    <tbody class="divide-y divide-slate-100">
+                        ${sorted.map((s,i)=>`<tr><td class="py-3 px-4">${i+1}</td><td class="py-3 px-4 font-medium">${escapeHtml(s[0])}</td><td class="py-3 px-4 text-right font-bold">${s[1]}</td></tr>`).join('') || '<tr><td colspan="3" class="py-8 text-center text-slate-400">Ma\'lumot topilmadi</td></tr>'}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    } else if(type==='profit') {
+        const totalRevenue = filteredOrders.reduce((s,o)=>s+o.total,0);
+        const totalCost = filteredOrders.reduce((s,o)=>s+o.items.reduce((is,i)=>is+(i.qty*(db.products.find(p=>p.id==i.productId)?.cost||0)),0),0);
+        const profit = totalRevenue - totalCost;
+        
+        html = `
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div class="bg-green-50 p-4 rounded-xl"><p class="text-slate-500 text-sm">Tushum</p><p class="text-2xl font-bold text-green-700">${formatMoney(totalRevenue)}</p></div>
+                <div class="bg-red-50 p-4 rounded-xl"><p class="text-slate-500 text-sm">Xarajat</p><p class="text-2xl font-bold text-red-700">${formatMoney(totalCost)}</p></div>
+                <div class="bg-cyan-50 p-4 rounded-xl"><p class="text-slate-500 text-sm">Sof foyda</p><p class="text-2xl font-bold text-cyan-700">${formatMoney(profit)}</p></div>
+            </div>
+            <div class="bg-slate-50 p-4 rounded-xl">
+                <p class="text-sm text-slate-600">Foydali ish ko'rsatkichi: <span class="font-bold ${profit>=0?'text-green-600':'text-red-600'}">${totalRevenue>0 ? ((profit/totalRevenue)*100).toFixed(1) : 0}%</span></p>
+            </div>
+        `;
+    }
+    
+    document.getElementById('reportContent').innerHTML = html;
+}
+
+function printReport() {
+    window.print();
+}
+
+// ==================== INIT ====================
+function refreshCurrentPage() {
+    const active = document.querySelector('.page.active');
+    if(!active) return;
+    const page = active.id.replace('page-','');
+    if(page==='dashboard') renderDashboard();
+    if(page==='pos') initPOS();
+    if(page==='inventory') renderInventory();
+    if(page==='crm') renderCRM();
+    if(page==='marketing') renderMarketing();
+    if(page==='employees') renderEmployees();
+    if(page==='reports') initReports();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Auto-focus login if visible
+    if(!document.getElementById('loginPage').classList.contains('hidden')) {
+        document.getElementById('loginUser').focus();
+    }
+    pullFromCloud().then(changed => {
+        if(changed && !document.getElementById('app').classList.contains('hidden')) {
+            refreshCurrentPage();
+        }
+    });
+});
+
+// ==================== PWA: Service Worker + O'rnatish taklifi ====================
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW ro\'yxatdan o\'tmadi', err));
+    });
+}
+
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    const btn = document.getElementById('installAppBtn');
+    if(btn) btn.classList.remove('hidden');
+});
+
+function installApp() {
+    if(!deferredInstallPrompt) { showToast('Ilova allaqachon o\'rnatilgan yoki brauzeringiz qo\'llab-quvvatlamaydi', 'info'); return; }
+    deferredInstallPrompt.prompt();
+    deferredInstallPrompt.userChoice.then(() => { deferredInstallPrompt = null; document.getElementById('installAppBtn').classList.add('hidden'); });
+}
+
+</script>
+</body>
+</html>
