@@ -1,4 +1,4 @@
-const CACHE_NAME = 'santex-express-v1';
+const CACHE_NAME = 'santex-express-v2';
 const APP_SHELL = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', (event) => {
@@ -23,6 +23,24 @@ self.addEventListener('fetch', (event) => {
   // Supabase, CDN va boshqa tashqi so'rovlarga tegmaymiz - ular doim tarmoqdan yuklanadi.
   if (url.origin !== self.location.origin) return;
 
+  // Asosiy HTML sahifa uchun: har doim AVVAL tarmoqdan yangisini olishga
+  // harakat qilamiz (network-first) - shunda yangi deploy darhol ko'rinadi.
+  // Faqat internet yo'q bo'lgandagina eski (keshdagi) nusxa ko'rsatiladi.
+  const isHTML = event.request.mode === 'navigate' || event.request.destination === 'document';
+  if (isHTML) {
+    event.respondWith(
+      fetch(event.request).then((response) => {
+        if (response && response.status === 200) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        }
+        return response;
+      }).catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
+  // Boshqa fayllar (ikonka, manifest...) uchun avvalgidek: kesh + fon rejimida yangilash
   event.respondWith(
     caches.match(event.request).then((cached) => {
       const network = fetch(event.request).then((response) => {
