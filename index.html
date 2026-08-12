@@ -198,7 +198,7 @@
                         <h3 class="font-bold text-slate-800 mb-4">Oxirgi sotuvlar</h3>
                         <div class="overflow-x-auto">
                             <table class="w-full text-sm">
-                                <thead class="text-slate-400 border-b border-slate-100"><tr><th class="text-left py-2 font-medium">ID</th><th class="text-left py-2 font-medium">Mijoz</th><th class="text-left py-2 font-medium">Summa</th><th class="text-left py-2 font-medium">Vaqt</th><th class="text-center py-2 font-medium">Chek</th></tr></thead>
+                                <thead class="text-slate-400 border-b border-slate-100"><tr><th class="text-left py-2 font-medium">ID</th><th class="text-left py-2 font-medium">Mijoz</th><th class="text-left py-2 font-medium">Summa</th><th class="text-left py-2 font-medium">Vaqt</th><th class="text-center py-2 font-medium">Amallar</th></tr></thead>
                                 <tbody id="recentOrdersTable" class="text-slate-600"></tbody>
                             </table>
                         </div>
@@ -220,6 +220,9 @@
                                 <input type="text" id="posSearch" placeholder="Mahsulot qidirish..." oninput="filterPosProducts()" class="w-full pl-10 pr-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500 outline-none">
                             </div>
                             <select id="posCategory" onchange="filterPosProducts()" class="w-32 sm:w-auto flex-shrink-0 px-2 sm:px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500 outline-none bg-white text-sm"></select>
+                            <button onclick="openReturnModal()" class="flex-shrink-0 px-3 sm:px-4 py-2.5 border border-orange-300 text-orange-600 rounded-xl hover:bg-orange-50 text-sm font-medium whitespace-nowrap" title="Mahsulot qaytarish (vozvrat)">
+                                <i class="fas fa-rotate-left"></i><span class="hidden sm:inline ml-1">Qaytarish</span>
+                            </button>
                         </div>
                         <div id="posResultCount" class="text-xs text-slate-400 mb-2 flex-shrink-0"></div>
                         <div id="posProducts" class="grid gap-2.5 sm:gap-3 overflow-y-auto flex-1 min-h-0 content-start auto-rows-max pb-4" style="grid-template-columns: repeat(auto-fill, minmax(135px, 1fr));"></div>
@@ -417,6 +420,7 @@
                         <option value="sales">Sotuvlar</option>
                         <option value="products">Mahsulotlar</option>
                         <option value="profit">Foyda</option>
+                        <option value="returns">Qaytarishlar</option>
                     </select>
                     <button onclick="generateReport()" class="bg-cyan-600 text-white px-6 py-2 rounded-lg hover:bg-cyan-700 transition"><i class="fas fa-filter mr-1"></i> Filtrlash</button>
                     <button onclick="printReport()" class="px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600"><i class="fas fa-print mr-1"></i> Chop etish</button>
@@ -528,9 +532,11 @@ function normalizeDB(loaded) {
         });
     }
     if (loaded.debtPayments === undefined) loaded.debtPayments = [];
+    if (loaded.returns === undefined) loaded.returns = [];
     (loaded.orders||[]).forEach(o => {
         if (o.paid === undefined) o.paid = o.payment === 'nasiya' ? 0 : o.total;
         if (o.debtAdded === undefined) o.debtAdded = o.payment === 'nasiya' ? o.total : 0;
+        (o.items||[]).forEach(i => { if (i.returnedQty === undefined) i.returnedQty = 0; });
     });
     return loaded;
 }
@@ -801,7 +807,7 @@ function renderDashboard() {
     const recent = [...db.orders].sort((a,b)=>b.id-a.id).slice(0,5);
     document.getElementById('recentOrdersTable').innerHTML = recent.map(o=>{
         const c = db.customers.find(x=>x.id==o.customerId);
-        return `<tr class="border-b border-slate-50"><td class="py-2">#${o.id.toString().slice(-4)}</td><td class="py-2">${c?escapeHtml(c.name):'Noma\'lum'}</td><td class="py-2 font-medium">${formatMoney(o.total)}</td><td class="py-2 text-slate-400 text-xs">${o.date.slice(11,16)}</td><td class="py-2 text-center"><button onclick="showReceipt(db.orders.find(x=>x.id===${o.id}))" class="text-cyan-600 hover:text-cyan-800"><i class="fas fa-receipt"></i></button></td></tr>`;
+        return `<tr class="border-b border-slate-50"><td class="py-2">#${o.id.toString().slice(-4)}</td><td class="py-2">${c?escapeHtml(c.name):'Noma\'lum'}</td><td class="py-2 font-medium">${formatMoney(o.total)}</td><td class="py-2 text-slate-400 text-xs">${o.date.slice(11,16)}</td><td class="py-2 text-center"><button onclick="showReceipt(db.orders.find(x=>x.id===${o.id}))" class="text-cyan-600 hover:text-cyan-800 mr-2" title="Chek"><i class="fas fa-receipt"></i></button><button onclick="openReturnModal(${o.id})" class="text-orange-500 hover:text-orange-700" title="Qaytarish"><i class="fas fa-rotate-left"></i></button></td></tr>`;
     }).join('') || '<tr><td colspan="4" class="py-4 text-center text-slate-400">Hali sotuv yo\'q</td></tr>';
 
     renderCharts();
@@ -1006,7 +1012,7 @@ function checkout() {
     const order = {
         id: Date.now(),
         customerId: customerId||null,
-        items: cart.map(c=>({productId:c.productId, name:c.name, price:c.price, qty:c.qty})),
+        items: cart.map(c=>({productId:c.productId, name:c.name, price:c.price, qty:c.qty, returnedQty:0})),
         subtotal: total+discount,
         discount: discount,
         total: total,
@@ -1087,6 +1093,144 @@ function printReceipt(orderId) {
     window.print();
 }
 window.addEventListener('afterprint', () => { document.body.classList.remove('printing-receipt'); });
+
+// ==================== QAYTARISH (VOZVRAT) ====================
+// prefillOrderId berilsa - to'g'ridan-to'g'ri shu sotuvni ochadi (masalan
+// hisobot/jadvaldagi "qaytarish" tugmasidan), aks holda qidiruv ekranini ko'rsatadi.
+function openReturnModal(prefillOrderId) {
+    openModal(`
+        <div class="p-6">
+            <h3 class="text-xl font-bold text-slate-800 mb-4"><i class="fas fa-rotate-left mr-2 text-orange-500"></i>Qaytarish (Vozvrat)</h3>
+            <div id="returnModalBody"></div>
+        </div>
+    `);
+    if (prefillOrderId) renderReturnOrderDetail(prefillOrderId);
+    else renderReturnSearchStep();
+}
+
+function renderReturnSearchStep() {
+    const body = document.getElementById('returnModalBody');
+    if(!body) return;
+    body.innerHTML = `
+        <input type="text" id="returnSearch" placeholder="Chek raqami yoki mijoz ismi/telefoni..." oninput="renderReturnSearchResults()" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none mb-3">
+        <div id="returnSearchResults" class="space-y-2 max-h-72 overflow-y-auto"></div>
+    `;
+    renderReturnSearchResults();
+}
+
+function renderReturnSearchResults() {
+    const el = document.getElementById('returnSearchResults');
+    if(!el) return;
+    const q = (document.getElementById('returnSearch').value || '').trim().toLowerCase();
+    let orders = [...db.orders].sort((a,b)=>b.id-a.id);
+    if(q) {
+        orders = orders.filter(o => {
+            const c = db.customers.find(x=>x.id==o.customerId);
+            return o.id.toString().includes(q) || (c && (c.name.toLowerCase().includes(q) || c.phone.includes(q)));
+        });
+    }
+    orders = orders.slice(0, 30);
+    el.innerHTML = orders.map(o => {
+        const c = db.customers.find(x=>x.id==o.customerId);
+        const hasReturnable = o.items.some(i => (i.qty - (i.returnedQty||0)) > 0);
+        return `
+        <div ${hasReturnable ? `onclick="renderReturnOrderDetail(${o.id})"` : ''} class="flex justify-between items-center p-3 rounded-xl border ${hasReturnable ? 'border-slate-200 hover:border-orange-300 hover:bg-orange-50 cursor-pointer' : 'border-slate-100 opacity-50'}">
+            <div>
+                <p class="font-medium text-sm text-slate-800">#${o.id.toString().slice(-6)} — ${c?escapeHtml(c.name):"Oddiy mijoz"}</p>
+                <p class="text-xs text-slate-400">${o.date.slice(0,10)} ${o.date.slice(11,16)} • ${formatMoney(o.total)}</p>
+            </div>
+            ${hasReturnable ? '<i class="fas fa-chevron-right text-slate-300"></i>' : '<span class="text-xs text-slate-400">To\'liq qaytarilgan</span>'}
+        </div>`;
+    }).join('') || '<p class="text-slate-400 text-sm text-center py-6">Sotuv topilmadi</p>';
+}
+
+function renderReturnOrderDetail(orderId) {
+    const order = db.orders.find(o=>o.id===orderId);
+    const body = document.getElementById('returnModalBody');
+    if(!body) return;
+    if(!order) { body.innerHTML = '<p class="text-slate-400 text-sm text-center py-6">Sotuv topilmadi</p>'; return; }
+    const c = order.customerId ? db.customers.find(x=>x.id==order.customerId) : null;
+    const canUseDebt = !!c;
+    const rows = order.items.map((i, idx) => {
+        const remaining = i.qty - (i.returnedQty||0);
+        if(remaining <= 0) return '';
+        return `
+        <div class="flex justify-between items-center p-2.5 bg-slate-50 rounded-lg gap-2">
+            <div class="min-w-0 flex-1">
+                <p class="text-sm font-medium text-slate-800 truncate">${escapeHtml(i.name)}</p>
+                <p class="text-xs text-slate-400">${formatMoney(i.price)} x sotilgan ${i.qty}${i.returnedQty?` (${i.returnedQty} qaytarilgan)`:''}</p>
+            </div>
+            <input type="number" id="returnQty_${idx}" min="0" max="${remaining}" value="0" class="w-16 text-center border border-slate-200 rounded-lg px-2 py-1.5 text-sm">
+        </div>`;
+    }).join('');
+    body.innerHTML = `
+        <button onclick="renderReturnSearchStep()" class="text-cyan-600 text-sm mb-3"><i class="fas fa-arrow-left mr-1"></i>Orqaga</button>
+        <p class="text-sm text-slate-500 mb-3">Chek #${order.id.toString().slice(-6)} — ${c?escapeHtml(c.name):"Oddiy mijoz"} — ${order.date.slice(0,10)}</p>
+        <div class="space-y-2 mb-4 max-h-64 overflow-y-auto">${rows || '<p class="text-slate-400 text-sm text-center py-4">Qaytariladigan mahsulot qolmagan</p>'}</div>
+        <textarea id="returnReason" placeholder="Sababi (ixtiyoriy)" rows="2" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm mb-3 resize-none"></textarea>
+        ${canUseDebt ? `
+        <div class="mb-3">
+            <label class="text-xs text-slate-500 block mb-1">Pul qanday qaytariladi?</label>
+            <select id="returnMethod" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white">
+                <option value="cash">Naqd/karta orqali qaytarib berildi</option>
+                <option value="debt">Mijoz qarzidan ayiriladi</option>
+            </select>
+        </div>` : `<input type="hidden" id="returnMethod" value="cash">`}
+        <div class="flex gap-3">
+            <button onclick="processReturn(${order.id})" class="flex-1 bg-orange-500 text-white py-2 rounded-lg hover:bg-orange-600 transition font-medium">Qaytarishni tasdiqlash</button>
+            <button onclick="closeModal()" class="flex-1 border border-slate-200 py-2 rounded-lg hover:bg-slate-50">Bekor qilish</button>
+        </div>
+    `;
+}
+
+function processReturn(orderId) {
+    const order = db.orders.find(o=>o.id===orderId);
+    if(!order) return;
+    const returnedItems = [];
+    let total = 0;
+    order.items.forEach((i, idx) => {
+        const input = document.getElementById('returnQty_'+idx);
+        if(!input) return;
+        let qty = parseInt(input.value) || 0;
+        const remaining = i.qty - (i.returnedQty||0);
+        if(qty > remaining) qty = remaining;
+        if(qty <= 0) return;
+        i.returnedQty = (i.returnedQty||0) + qty;
+        total += qty * i.price;
+        returnedItems.push({productId:i.productId, name:i.name, price:i.price, qty});
+        const p = db.products.find(x=>x.id===i.productId);
+        if(p) p.stock += qty;
+    });
+    if(returnedItems.length === 0) { showToast('Qaytariladigan mahsulot tanlanmadi!', 'error'); return; }
+
+    const methodEl = document.getElementById('returnMethod');
+    const method = methodEl ? methodEl.value : 'cash';
+    const reasonEl = document.getElementById('returnReason');
+    const reason = reasonEl ? reasonEl.value.trim() : '';
+    const c = order.customerId ? db.customers.find(x=>x.id==order.customerId) : null;
+    if(c) {
+        c.totalPurchases = Math.max(0, c.totalPurchases - total);
+        if(method === 'debt') c.debt = Math.max(0, c.debt - total);
+    }
+
+    db.returns = db.returns || [];
+    db.returns.push({
+        id: Date.now(),
+        orderId: order.id,
+        customerId: order.customerId || null,
+        items: returnedItems,
+        total,
+        method,
+        reason,
+        processedBy: currentUser ? currentUser.name : '',
+        date: new Date().toISOString()
+    });
+
+    saveDB();
+    closeModal();
+    showToast(`${formatMoney(total)} qaytarildi!`);
+    refreshCurrentPage();
+}
 
 // ==================== INVENTORY ====================
 function renderInventory() {
@@ -1615,7 +1759,7 @@ function generateReport() {
                     <tbody class="divide-y divide-slate-100">
                         ${filteredOrders.map(o=>{
                             const c = db.customers.find(x=>x.id==o.customerId);
-                            return `<tr><td class="py-3 px-4">#${o.id.toString().slice(-6)}</td><td class="py-3 px-4">${c?escapeHtml(c.name):'Noma\'lum'}</td><td class="py-3 px-4 text-right font-medium">${formatMoney(o.total)}</td><td class="py-3 px-4 text-center"><span class="bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded">${PAYMENT_LABELS[o.payment]||o.payment}</span>${o.debtAdded>0?`<div class="text-[10px] text-red-500 mt-1">Qarz: ${formatMoney(o.debtAdded)}</div>`:''}</td><td class="py-3 px-4 text-slate-500 text-xs">${o.date.slice(0,10)} ${o.date.slice(11,16)}</td><td class="py-3 px-4 text-center"><button onclick="showReceipt(db.orders.find(x=>x.id===${o.id}))" class="text-cyan-600 hover:text-cyan-800"><i class="fas fa-receipt"></i></button></td></tr>`;
+                            return `<tr><td class="py-3 px-4">#${o.id.toString().slice(-6)}</td><td class="py-3 px-4">${c?escapeHtml(c.name):'Noma\'lum'}</td><td class="py-3 px-4 text-right font-medium">${formatMoney(o.total)}</td><td class="py-3 px-4 text-center"><span class="bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded">${PAYMENT_LABELS[o.payment]||o.payment}</span>${o.debtAdded>0?`<div class="text-[10px] text-red-500 mt-1">Qarz: ${formatMoney(o.debtAdded)}</div>`:''}</td><td class="py-3 px-4 text-slate-500 text-xs">${o.date.slice(0,10)} ${o.date.slice(11,16)}</td><td class="py-3 px-4 text-center"><button onclick="showReceipt(db.orders.find(x=>x.id===${o.id}))" class="text-cyan-600 hover:text-cyan-800 mr-2" title="Chek"><i class="fas fa-receipt"></i></button><button onclick="openReturnModal(${o.id})" class="text-orange-500 hover:text-orange-700" title="Qaytarish"><i class="fas fa-rotate-left"></i></button></td></tr>`;
                         }).join('') || '<tr><td colspan="6" class="py-8 text-center text-slate-400">Ma\'lumot topilmadi</td></tr>'}
                     </tbody>
                 </table>
@@ -1654,8 +1798,40 @@ function generateReport() {
                 <p class="text-sm text-slate-600">Foydali ish ko'rsatkichi: <span class="font-bold ${profit>=0?'text-green-600':'text-red-600'}">${totalRevenue>0 ? ((profit/totalRevenue)*100).toFixed(1) : 0}%</span></p>
             </div>
         `;
+    } else if(type==='returns') {
+        const filteredReturns = (db.returns||[]).filter(r => {
+            const d = new Date(r.date);
+            return d >= fromDate && d <= toDate;
+        }).sort((a,b)=>b.id-a.id);
+        const total = filteredReturns.reduce((s,r)=>s+r.total,0);
+
+        html = `
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div class="bg-orange-50 p-4 rounded-xl"><p class="text-slate-500 text-sm">Jami qaytarilgan summa</p><p class="text-2xl font-bold text-orange-700">${formatMoney(total)}</p></div>
+                <div class="bg-slate-50 p-4 rounded-xl"><p class="text-slate-500 text-sm">Qaytarishlar soni</p><p class="text-2xl font-bold text-slate-700">${filteredReturns.length}</p></div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-slate-50 text-slate-500"><tr><th class="text-left py-3 px-4">Sana</th><th class="text-left py-3 px-4">Mijoz</th><th class="text-left py-3 px-4">Mahsulotlar</th><th class="text-right py-3 px-4">Summa</th><th class="text-center py-3 px-4">Usul</th><th class="text-left py-3 px-4">Sababi</th><th class="text-left py-3 px-4">Kim</th></tr></thead>
+                    <tbody class="divide-y divide-slate-100">
+                        ${filteredReturns.map(r=>{
+                            const c = db.customers.find(x=>x.id==r.customerId);
+                            return `<tr>
+                                <td class="py-3 px-4 text-slate-500 text-xs">${r.date.slice(0,10)} ${r.date.slice(11,16)}</td>
+                                <td class="py-3 px-4">${c?escapeHtml(c.name):"Oddiy mijoz"}</td>
+                                <td class="py-3 px-4 text-slate-600 text-xs">${r.items.map(i=>escapeHtml(i.name)+' x'+i.qty).join(', ')}</td>
+                                <td class="py-3 px-4 text-right font-medium text-orange-600">${formatMoney(r.total)}</td>
+                                <td class="py-3 px-4 text-center"><span class="bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded">${r.method==='debt'?"Qarzdan ayirildi":"Naqd/karta"}</span></td>
+                                <td class="py-3 px-4 text-slate-500 text-xs">${escapeHtml(r.reason||'-')}</td>
+                                <td class="py-3 px-4 text-slate-500 text-xs">${escapeHtml(r.processedBy||'-')}</td>
+                            </tr>`;
+                        }).join('') || '<tr><td colspan="7" class="py-8 text-center text-slate-400">Ma\'lumot topilmadi</td></tr>'}
+                    </tbody>
+                </table>
+            </div>
+        `;
     }
-    
+
     document.getElementById('reportContent').innerHTML = html;
 }
 
