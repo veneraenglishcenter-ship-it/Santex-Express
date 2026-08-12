@@ -32,6 +32,7 @@
         @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         .low-stock { border-left: 4px solid #ef4444; }
         .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        #sidebar.sidebar-collapsed { width: 0; }
         @media print {
             .no-print { display: none !important; }
             .print-only { display: block !important; }
@@ -81,7 +82,8 @@
 <div id="app" class="hidden h-[100dvh] flex flex-col md:flex-row overflow-hidden">
     
     <!-- SIDEBAR -->
-    <aside id="sidebar" class="sidebar w-64 bg-slate-900 text-white flex flex-col h-full flex-shrink-0 z-20 fixed md:relative -translate-x-full md:translate-x-0">
+    <aside id="sidebar" class="sidebar w-64 bg-slate-900 text-white h-full flex-shrink-0 z-30 fixed md:relative -translate-x-full md:translate-x-0 transition-all duration-300 overflow-hidden">
+      <div class="w-64 h-full flex flex-col">
         <div class="p-6 border-b border-slate-800">
             <div class="flex items-center gap-3">
                 <div class="w-10 h-10 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-lg flex items-center justify-center shadow-lg">
@@ -133,7 +135,14 @@
                 <button onclick="logout()" class="text-slate-400 hover:text-white transition"><i class="fas fa-sign-out-alt"></i></button>
             </div>
         </div>
+      </div>
     </aside>
+
+    <!-- Doim ko'rinadigan yig'ish/yoyish tugmasi (katta ekranlarda) -->
+    <button id="sidebarEdgeToggle" onclick="toggleSidebar()" class="hidden md:flex fixed z-40 top-1/2 -translate-y-1/2 w-6 h-14 bg-slate-800 hover:bg-slate-700 text-white items-center justify-center rounded-r-lg shadow-lg transition-all duration-300" style="left: 16rem;">
+        <i id="sidebarEdgeIcon" class="fas fa-chevron-left text-xs"></i>
+    </button>
+
 
     <!-- MAIN CONTENT -->
     <main class="flex-1 flex flex-col h-full overflow-hidden bg-slate-50 relative">
@@ -225,7 +234,7 @@
                             </button>
                         </div>
                         <div id="posResultCount" class="text-xs text-slate-400 mb-2 flex-shrink-0"></div>
-                        <div id="posProducts" class="grid gap-2.5 sm:gap-3 overflow-y-auto flex-1 min-h-0 content-start auto-rows-max pb-4" style="grid-template-columns: repeat(auto-fill, minmax(135px, 1fr));"></div>
+                        <div id="posProducts" class="grid gap-2.5 sm:gap-3 overflow-y-auto flex-1 min-h-0 content-start auto-rows-max pb-4" style="grid-template-columns: repeat(auto-fill, minmax(105px, 1fr));"></div>
                     </div>
                     <div class="w-full lg:w-[30rem] bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col min-h-0 basis-0 flex-[3] lg:flex-none lg:h-full">
                         <div class="p-3 sm:p-4 border-b border-slate-100 flex justify-between items-center flex-shrink-0">
@@ -770,7 +779,16 @@ function navTo(page) {
     if(window.innerWidth < 768) document.getElementById('sidebar').classList.add('-translate-x-full');
 }
 function toggleSidebar() {
-    document.getElementById('sidebar').classList.toggle('-translate-x-full');
+    const sidebar = document.getElementById('sidebar');
+    const icon = document.getElementById('sidebarEdgeIcon');
+    const edgeBtn = document.getElementById('sidebarEdgeToggle');
+    if (window.innerWidth < 768) {
+        sidebar.classList.toggle('-translate-x-full');
+    } else {
+        const collapsed = sidebar.classList.toggle('sidebar-collapsed');
+        if (edgeBtn) edgeBtn.style.left = collapsed ? '0' : '16rem';
+        if (icon) icon.className = collapsed ? 'fas fa-chevron-right text-xs' : 'fas fa-chevron-left text-xs';
+    }
 }
 
 function initApp() {
