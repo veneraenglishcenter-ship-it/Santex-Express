@@ -60,22 +60,19 @@
         </div>
         <div class="space-y-4">
             <div>
-                <label class="block text-sm font-medium text-slate-700 mb-1">Login</label>
-                <input type="text" id="loginUser" value="admin" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">
+                <label class="block text-sm font-medium text-slate-700 mb-1">Email</label>
+                <input type="email" id="loginEmail" autocomplete="username" placeholder="email@santex.uz" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">
             </div>
             <div>
                 <label class="block text-sm font-medium text-slate-700 mb-1">Parol</label>
-                <input type="password" id="loginPass" value="admin123" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">
+                <input type="password" id="loginPass" autocomplete="current-password" placeholder="••••••••" onkeydown="if(event.key==='Enter') doLogin()" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">
             </div>
-            <button onclick="doLogin()" class="w-full bg-gradient-to-r from-cyan-600 to-blue-600 text-white py-2.5 rounded-lg font-medium hover:from-cyan-700 hover:to-blue-700 transition shadow-lg">
+            <button id="loginBtn" onclick="doLogin()" class="w-full bg-gradient-to-r from-cyan-600 to-blue-600 text-white py-2.5 rounded-lg font-medium hover:from-cyan-700 hover:to-blue-700 transition shadow-lg">
                 <i class="fas fa-sign-in-alt mr-2"></i>Kirish
-            </button>
-            <button onclick="resetDemoData()" class="w-full text-cyan-600 text-sm py-2 hover:underline">
-                <i class="fas fa-undo mr-1"></i>Demo ma'lumotlarni tiklash
             </button>
         </div>
         <div class="mt-4 text-center text-xs text-slate-400">
-            Login: admin | Parol: admin123
+            Hisobingiz yo'qmi? Administratorga murojaat qiling.
         </div>
     </div>
 </div>
@@ -110,13 +107,13 @@
             <button onclick="navTo('crm')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition hover:bg-slate-800 text-slate-300 hover:text-white group" data-page="crm">
                 <i class="fas fa-users w-5 text-center group-hover:text-cyan-400"></i><span>Mijozlar (CRM)</span>
             </button>
-            <button onclick="navTo('marketing')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition hover:bg-slate-800 text-slate-300 hover:text-white group" data-page="marketing">
+            <button onclick="navTo('marketing')" class="nav-btn admin-only w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition hover:bg-slate-800 text-slate-300 hover:text-white group" data-page="marketing">
                 <i class="fas fa-bullhorn w-5 text-center group-hover:text-cyan-400"></i><span>Marketing</span>
             </button>
-            <button onclick="navTo('employees')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition hover:bg-slate-800 text-slate-300 hover:text-white group" data-page="employees">
+            <button onclick="navTo('employees')" class="nav-btn admin-only w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition hover:bg-slate-800 text-slate-300 hover:text-white group" data-page="employees">
                 <i class="fas fa-user-tie w-5 text-center group-hover:text-cyan-400"></i><span>Xodimlar</span>
             </button>
-            <button onclick="navTo('reports')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition hover:bg-slate-800 text-slate-300 hover:text-white group" data-page="reports">
+            <button onclick="navTo('reports')" class="nav-btn admin-only w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition hover:bg-slate-800 text-slate-300 hover:text-white group" data-page="reports">
                 <i class="fas fa-file-alt w-5 text-center group-hover:text-cyan-400"></i><span>Hisobotlar</span>
             </button>
         </nav>
@@ -128,10 +125,10 @@
         </div>
         <div class="p-4 border-t border-slate-800">
             <div class="flex items-center gap-3 px-4 py-2">
-                <div class="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-sm font-bold">A</div>
+                <div id="sidebarUserAvatar" class="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-sm font-bold">?</div>
                 <div class="flex-1 min-w-0">
-                    <p class="text-sm font-medium truncate">Administrator</p>
-                    <p class="text-xs text-slate-400">Santex Express</p>
+                    <p class="text-sm font-medium truncate" id="sidebarUserName">...</p>
+                    <p class="text-xs text-slate-400" id="sidebarUserRole">Santex Express</p>
                 </div>
                 <button onclick="logout()" class="text-slate-400 hover:text-white transition"><i class="fas fa-sign-out-alt"></i></button>
             </div>
@@ -269,7 +266,7 @@
             <div id="page-inventory" class="page">
                 <div class="flex justify-between items-center mb-6">
                     <h1 class="text-2xl font-bold text-slate-800">Omborxona</h1>
-                    <button onclick="openProductModal()" class="bg-gradient-to-r from-cyan-600 to-blue-600 text-white px-5 py-2.5 rounded-xl font-medium hover:shadow-lg transition flex items-center gap-2">
+                    <button onclick="openProductModal()" class="admin-only bg-gradient-to-r from-cyan-600 to-blue-600 text-white px-5 py-2.5 rounded-xl font-medium hover:shadow-lg transition flex items-center gap-2">
                         <i class="fas fa-plus"></i> Mahsulot qo'shish
                     </button>
                 </div>
@@ -301,7 +298,7 @@
                         <div class="flex gap-2">
                             <button onclick="exportInventoryCSV()" class="px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600 text-sm whitespace-nowrap"><i class="fas fa-download mr-1"></i> Excel</button>
                             <input type="file" id="invImportFile" accept=".csv" class="hidden" onchange="importInventoryCSV(event)">
-                            <button onclick="document.getElementById('invImportFile').click()" class="px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600 text-sm whitespace-nowrap" title="Avval yuklab olingan Excel (CSV) faylni qayta yuklash"><i class="fas fa-upload mr-1"></i> Yuklash</button>
+                            <button onclick="document.getElementById('invImportFile').click()" class="admin-only px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600 text-sm whitespace-nowrap" title="Avval yuklab olingan Excel (CSV) faylni qayta yuklash"><i class="fas fa-upload mr-1"></i> Yuklash</button>
                         </div>
                     </div>
                     <div class="overflow-x-auto">
@@ -427,6 +424,7 @@
                     <button onclick="exportBackup()" class="px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600" title="Barcha ma'lumotlarni JSON fayl sifatida yuklab olish"><i class="fas fa-cloud-download-alt mr-1"></i> Zaxira olish</button>
                     <input type="file" id="restoreFile" accept="application/json" class="hidden" onchange="importBackup(event)">
                     <button onclick="document.getElementById('restoreFile').click()" class="px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600" title="Zaxira fayldan ma'lumotlarni tiklash"><i class="fas fa-cloud-upload-alt mr-1"></i> Tiklash</button>
+                    <button onclick="resetDemoData()" class="px-4 py-2 border border-red-200 rounded-lg hover:bg-red-50 text-red-500" title="Barcha ma'lumotlarni demo holatga qaytarish (faqat sinov uchun)"><i class="fas fa-undo mr-1"></i> Demo holatga qaytarish</button>
                 </div>
                 <div id="reportContent" class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
                     <div class="text-center text-slate-400 py-12">Sanalarni tanlab, "Filtrlash" tugmasini bosing</div>
@@ -451,7 +449,6 @@
 <script>
 // ==================== DATA ====================
 const defaultData = {
-    users: [{id:1, username:'admin', password:'admin123', name:'Administrator', role:'admin'}],
     categories: ['Kranlar', 'Smesitellar', 'Trubalar', 'Vanna', 'Unitaz', 'Radiatorlar', 'Aksessuarlar', 'Xizmatlar'],
     products: [
         {id:1, name:'Sharavoy kran (latun)', category:'Kranlar', price:45000, cost:28000, stock:12, barcode:'10001', minStock:5},
@@ -491,11 +488,13 @@ const defaultData = {
 };
 
 function resetDemoData() {
-    if(!confirm('Diqqat! Joriy barcha ma\'lumotlar (sotuvlar, mijozlar, mahsulotlar) o\'chib, demo ma\'lumotlar bilan almashtiriladi. Bu amalni orqaga qaytarib bo\'lmaydi. Davom etasizmi?')) return;
+    if(!requireAdmin()) return;
+    if(!confirm('Diqqat! BARCHA xodimlar uchun umumiy bulut ma\'lumotlari (sotuvlar, mijozlar, mahsulotlar) o\'chib, demo ma\'lumotlar bilan almashtiriladi. Bu amalni orqaga qaytarib bo\'lmaydi. Davom etasizmi?')) return;
     localStorage.setItem('santexDB', JSON.stringify(defaultData));
     db = JSON.parse(JSON.stringify(defaultData));
     saveDB();
-    showToast('Demo ma\'lumotlar tiklandi! Endi "Kirish" tugmasini bosing.', 'success');
+    showToast('Demo ma\'lumotlar tiklandi!', 'success');
+    refreshCurrentPage();
 }
 
 // ==================== CLOUD SYNC (Supabase) ====================
@@ -597,6 +596,26 @@ let db = initDB();
 let cart = [];
 let currentPayment = 'cash';
 let charts = {};
+let currentUser = null;
+
+// Faqat admin bajarishi kerak bo'lgan amallar uchun himoya.
+// Diqqat: bu faqat interfeysdagi (client) himoya - haqiqiy huquq nazorati
+// Supabase RLS orqali serverda ham o'rnatilishi kerak (supabase-security-setup.sql'ga qarang).
+function requireAdmin() {
+    if (!currentUser || currentUser.role !== 'admin') {
+        showToast('Bu amal uchun administrator huquqi kerak', 'error');
+        return false;
+    }
+    return true;
+}
+
+// Rolga qarab interfeys elementlarini ko'rsatish/yashirish
+function applyRoleUI() {
+    const isAdmin = currentUser && currentUser.role === 'admin';
+    document.querySelectorAll('.admin-only').forEach(el => {
+        el.classList.toggle('hidden', !isAdmin);
+    });
+}
 
 // ==================== UTILS ====================
 function formatMoney(n) {
@@ -635,6 +654,7 @@ document.getElementById('modalOverlay').addEventListener('click', (e) => { if(e.
 
 // ==================== BACKUP / RESTORE ====================
 function exportBackup() {
+    if(!requireAdmin()) return;
     const blob = new Blob([JSON.stringify(db, null, 2)], {type:'application/json'});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -645,6 +665,7 @@ function exportBackup() {
     showToast('Zaxira nusxa yuklab olindi!');
 }
 function importBackup(event) {
+    if(!requireAdmin()) { event.target.value=''; return; }
     const file = event.target.files[0];
     if(!file) return;
     if(!confirm('Joriy ma\'lumotlar zaxiradagi ma\'lumotlar bilan to\'liq almashtiriladi. Davom etasizmi?')) { event.target.value=''; return; }
@@ -666,27 +687,66 @@ function importBackup(event) {
     event.target.value = '';
 }
 
-// ==================== AUTH ====================
-function doLogin() {
-    const u = document.getElementById('loginUser').value.trim();
-    const p = document.getElementById('loginPass').value;
-    if(!u || !p) { showToast('Login va parolni kiriting!', 'error'); return; }
-    const user = db.users.find(x => x.username === u && x.password === p);
-    if (user) {
-        document.getElementById('loginPage').classList.add('hidden');
-        document.getElementById('app').classList.remove('hidden');
-        document.getElementById('app').classList.add('flex');
-        document.getElementById('todayDate').textContent = new Date().toLocaleDateString('uz-UZ', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
-        initApp();
-        showToast('Xush kelibsiz, ' + user.name + '!');
-    } else {
+// ==================== AUTH (Supabase Auth) ====================
+async function doLogin() {
+    if(!sb) { showToast('Bulut ulanmagan, tizimga kirib bo\'lmaydi!', 'error'); return; }
+    const email = document.getElementById('loginEmail').value.trim();
+    const pass = document.getElementById('loginPass').value;
+    if(!email || !pass) { showToast('Email va parolni kiriting!', 'error'); return; }
+    const btn = document.getElementById('loginBtn');
+    const originalBtnHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin mr-2"></i>Tekshirilmoqda...';
+    try {
+        const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+        if (error) throw error;
+        await enterApp(data.user);
+    } catch(e) {
+        console.error('Login error', e);
         showToast('Login yoki parol noto\'g\'ri!', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalBtnHtml;
     }
 }
-function logout() { location.reload(); }
+
+// Muvaffaqiyatli autentifikatsiyadan keyin (yangi login yoki saqlangan sessiya orqali) ilovaga kirish
+async function enterApp(user) {
+    const { data: profile, error } = await sb.from('profiles').select('name, role').eq('id', user.id).maybeSingle();
+    if (error || !profile) {
+        console.error('Profil topilmadi', error);
+        showToast('Profilingiz topilmadi. Administratorga murojaat qiling.', 'error');
+        await sb.auth.signOut();
+        return;
+    }
+    currentUser = { id: user.id, email: user.email, name: profile.name || user.email, role: profile.role };
+
+    document.getElementById('loginPage').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+    document.getElementById('app').classList.add('flex');
+    document.getElementById('todayDate').textContent = new Date().toLocaleDateString('uz-UZ', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
+    document.getElementById('sidebarUserName').textContent = currentUser.name;
+    document.getElementById('sidebarUserAvatar').textContent = (currentUser.name||'?').trim().charAt(0).toUpperCase();
+    document.getElementById('sidebarUserRole').textContent = currentUser.role === 'admin' ? 'Administrator' : 'Kassir';
+    applyRoleUI();
+
+    await pullFromCloud();
+    initApp();
+    showToast('Xush kelibsiz, ' + currentUser.name + '!');
+}
+
+function logout() {
+    if(sb) sb.auth.signOut().finally(() => location.reload());
+    else location.reload();
+}
 
 // ==================== NAVIGATION ====================
+const ADMIN_ONLY_PAGES = ['marketing', 'employees', 'reports'];
 function navTo(page) {
+    if (currentUser && currentUser.role !== 'admin' && ADMIN_ONLY_PAGES.includes(page)) {
+        showToast('Sizda bu bo\'limga ruxsat yo\'q', 'error');
+        page = 'dashboard';
+    }
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.getElementById('page-'+page).classList.add('active');
     document.querySelectorAll('.nav-btn').forEach(b => {
@@ -1062,14 +1122,17 @@ function renderInventory() {
             <td class="py-3 px-4 text-right text-slate-500">${formatMoney(p.cost)}</td>
             <td class="py-3 px-4 text-right ${p.stock<=p.minStock?'text-red-600 font-bold':'text-slate-600'}">${p.stock}</td>
             <td class="py-3 px-4 text-center">
+                ${currentUser && currentUser.role==='admin' ? `
                 <button onclick="openProductModal(${p.id})" class="text-cyan-600 hover:text-cyan-800 mr-2"><i class="fas fa-edit"></i></button>
                 <button onclick="deleteProduct(${p.id})" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button>
+                ` : '<span class="text-slate-300">—</span>'}
             </td>
         </tr>
     `).join('');
 }
 
 function openProductModal(editId) {
+    if(!requireAdmin()) return;
     const p = editId ? db.products.find(x=>x.id===editId) : null;
     openModal(`
         <div class="p-6">
@@ -1107,6 +1170,7 @@ function toggleNewCategoryInput() {
 }
 
 function saveProduct(editId) {
+    if(!requireAdmin()) return;
     const name = document.getElementById('pName').value.trim();
     let category = document.getElementById('pCategory').value;
     const price = parseInt(document.getElementById('pPrice').value)||0;
@@ -1135,6 +1199,7 @@ function saveProduct(editId) {
 }
 
 function deleteProduct(id) {
+    if(!requireAdmin()) return;
     if(!confirm('Rostdan ham o\'chirmoqchimisiz?')) return;
     db.products = db.products.filter(x=>x.id!==id);
     saveDB(); renderInventory(); showToast('O\'chirildi!');
@@ -1150,6 +1215,7 @@ function exportInventoryCSV() {
 }
 
 function importInventoryCSV(event) {
+    if(!requireAdmin()) { event.target.value=''; return; }
     const file = event.target.files[0];
     if(!file) return;
     const reader = new FileReader();
@@ -1203,8 +1269,10 @@ function renderCRM() {
             <td class="py-3 px-4 text-right text-slate-600">${formatMoney(c.totalPurchases)}</td>
             <td class="py-3 px-4 text-center">
                 ${c.debt>0?`<button onclick="openDebtPaymentModal(${c.id})" class="text-green-600 hover:text-green-800 mr-2" title="To'lov qabul qilish"><i class="fas fa-money-bill-wave"></i></button>`:''}
+                ${currentUser && currentUser.role==='admin' ? `
                 <button onclick="editCustomer(${c.id})" class="text-cyan-600 hover:text-cyan-800 mr-2"><i class="fas fa-edit"></i></button>
                 <button onclick="deleteCustomer(${c.id})" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button>
+                ` : ''}
             </td>
         </tr>
     `).join('');
@@ -1227,7 +1295,14 @@ function renderCRM() {
 }
 
 function openCustomerModal(editId) {
+    if(editId && !requireAdmin()) return;
     const c = editId ? db.customers.find(x=>x.id===editId) : null;
+    const isAdmin = currentUser && currentUser.role === 'admin';
+    // Kassir yangi mijoz qo'sha oladi, lekin qarzni qo'lda kiritolmaydi
+    // (qarz faqat sotuv/nasiya yoki "To'lov qabul qilish" orqali o'zgaradi)
+    const debtField = isAdmin
+        ? `<input type="number" id="cDebt" value="${c?c.debt:0}" placeholder="Qarz" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">`
+        : `<input type="hidden" id="cDebt" value="0">`;
     openModal(`
         <div class="p-6">
             <h3 class="text-xl font-bold text-slate-800 mb-4">${c?'Mijozni tahrirlash':'Yangi mijoz'}</h3>
@@ -1235,7 +1310,7 @@ function openCustomerModal(editId) {
                 <input type="text" id="cName" value="${c?escapeHtml(c.name):''}" placeholder="FIO" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">
                 <input type="text" id="cPhone" value="${c?escapeHtml(c.phone):''}" placeholder="Telefon" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">
                 <input type="text" id="cAddress" value="${c?escapeHtml(c.address):''}" placeholder="Manzil" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">
-                <input type="number" id="cDebt" value="${c?c.debt:0}" placeholder="Qarz" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">
+                ${debtField}
                 <div class="flex gap-3 mt-4">
                     <button onclick="saveCustomer(${c?c.id:'null'})" class="flex-1 bg-cyan-600 text-white py-2 rounded-lg hover:bg-cyan-700 transition">Saqlash</button>
                     <button onclick="closeModal()" class="flex-1 border border-slate-200 py-2 rounded-lg hover:bg-slate-50">Bekor qilish</button>
@@ -1246,6 +1321,7 @@ function openCustomerModal(editId) {
 }
 
     function saveCustomer(editId) {
+    if(editId && editId!=='null' && !requireAdmin()) return;
     const name = document.getElementById('cName').value.trim();
     const phone = document.getElementById('cPhone').value.trim();
     const address = document.getElementById('cAddress').value.trim();
@@ -1266,6 +1342,7 @@ function openCustomerModal(editId) {
 function editCustomer(id) { openCustomerModal(id); }
 
 function deleteCustomer(id) {
+    if(!requireAdmin()) return;
     if(!confirm('Rostdan ham o\'chirmoqchimisiz?')) return;
     db.customers = db.customers.filter(x=>x.id!==id);
     saveDB(); renderCRM(); showToast('Mijoz o\'chirildi!');
@@ -1323,6 +1400,7 @@ function renderMarketing() {
 }
 
 function openCampaignModal() {
+    if(!requireAdmin()) return;
     openModal(`
         <div class="p-6">
             <h3 class="text-xl font-bold text-slate-800 mb-4">Yangi kampaniya</h3>
@@ -1345,6 +1423,7 @@ function openCampaignModal() {
 }
 
 function saveCampaign() {
+    if(!requireAdmin()) return;
     const name = document.getElementById('campName').value.trim();
     const type = document.getElementById('campType').value;
     const content = document.getElementById('campContent').value.trim();
@@ -1358,6 +1437,7 @@ function saveCampaign() {
 }
 
 function deleteCampaign(id) {
+    if(!requireAdmin()) return;
     if(!confirm('Rostdan ham o\'chirmoqchimisiz?')) return;
     db.campaigns = db.campaigns.filter(x=>x.id!==id);
     saveDB(); renderMarketing(); showToast('O\'chirildi!');
@@ -1444,6 +1524,7 @@ function checkOutEmployee(id) {
 }
 
 function openEmployeeModal(editId) {
+    if(!requireAdmin()) return;
     const e = editId ? db.employees.find(x=>x.id===editId) : null;
     openModal(`
         <div class="p-6">
@@ -1464,6 +1545,7 @@ function openEmployeeModal(editId) {
 }
 
 function saveEmployee(editId) {
+    if(!requireAdmin()) return;
     const name = document.getElementById('eName').value.trim();
     const role = document.getElementById('eRole').value.trim();
     const phone = document.getElementById('ePhone').value.trim();
@@ -1483,6 +1565,7 @@ function saveEmployee(editId) {
 }
 
 function deleteEmployee(id) {
+    if(!requireAdmin()) return;
     if(!confirm('Rostdan ham o\'chirmoqchimisiz?')) return;
     db.employees = db.employees.filter(x=>x.id!==id);
     saveDB(); renderEmployees(); showToast('Xodim o\'chirildi!');
@@ -1593,16 +1676,20 @@ function refreshCurrentPage() {
     if(page==='reports') initReports();
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    // Auto-focus login if visible
-    if(!document.getElementById('loginPage').classList.contains('hidden')) {
-        document.getElementById('loginUser').focus();
+document.addEventListener('DOMContentLoaded', async () => {
+    if(!sb) {
+        setSyncStatus('offline');
+        showToast('Bulutga ulanib bo\'lmadi, internetni tekshiring.', 'error');
+        document.getElementById('loginEmail').focus();
+        return;
     }
-    pullFromCloud().then(changed => {
-        if(changed && !document.getElementById('app').classList.contains('hidden')) {
-            refreshCurrentPage();
-        }
-    });
+    // Avval saqlangan sessiya bor-yo'qligini tekshiramiz (qayta login talab qilinmasin)
+    const { data: { session } } = await sb.auth.getSession();
+    if (session && session.user) {
+        await enterApp(session.user);
+    } else {
+        document.getElementById('loginEmail').focus();
+    }
 });
 
 // ==================== PWA: Service Worker + O'rnatish taklifi ====================
