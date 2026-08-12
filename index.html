@@ -703,7 +703,8 @@ async function doLogin() {
         await enterApp(data.user);
     } catch(e) {
         console.error('Login error', e);
-        showToast('Login yoki parol noto\'g\'ri!', 'error');
+        const msg = (e && e.message) || 'Nomalum xato';
+        showToast('Kirishda xato: ' + msg, 'error');
     } finally {
         btn.disabled = false;
         btn.innerHTML = originalBtnHtml;
