@@ -637,6 +637,17 @@ function formatMoney(n) {
     return new Intl.NumberFormat('uz-UZ').format(Math.round(n)) + ' so\'m';
 }
 const PAYMENT_LABELS = {cash:'Naqd', card:'Karta', transfer:"O'tkazma", nasiya:'Nasiya'};
+
+// Sotuvning qaytarilgan qismlarini hisobga olib, sof (net) summasini qaytaradi.
+// Hisobot va statistikalarda har doim shu funksiya orqali hisoblanadi -
+// qaytarilgan mahsulot puli "sotilgan" deb hisoblanmasligi uchun.
+function orderNetTotal(o) {
+    const returnedAmount = (o.items||[]).reduce((s,i)=>s+((i.returnedQty||0)*i.price),0);
+    return Math.max(0, o.total - returnedAmount);
+}
+function orderItemNetQty(i) {
+    return Math.max(0, i.qty - (i.returnedQty||0));
+}
 function escapeHtml(str) {
     if (str === null || str === undefined) return '';
     return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
@@ -799,7 +810,7 @@ function initApp() {
 function renderDashboard() {
     const today = new Date().toISOString().split('T')[0];
     const todayOrders = db.orders.filter(o => o.date.startsWith(today));
-    const todaySales = todayOrders.reduce((s,o)=>s+o.total,0);
+    const todaySales = todayOrders.reduce((s,o)=>s+orderNetTotal(o),0);
     const lowStock = db.products.filter(p => p.stock <= p.minStock);
     const debtCustomers = db.customers.filter(c => c.debt > 0);
     const totalDebt = debtCustomers.reduce((s,c)=>s+c.debt,0);
@@ -843,7 +854,7 @@ function renderCharts() {
         const d = new Date(); d.setDate(d.getDate()-i);
         const ds = d.toISOString().split('T')[0];
         days.push(d.toLocaleDateString('uz-UZ',{day:'numeric', month:'short'}));
-        sales.push(db.orders.filter(o=>o.date.startsWith(ds)).reduce((s,o)=>s+o.total,0));
+        sales.push(db.orders.filter(o=>o.date.startsWith(ds)).reduce((s,o)=>s+orderNetTotal(o),0));
     }
     charts.sales = new Chart(ctx1, {
         type: 'line',
@@ -854,7 +865,7 @@ function renderCharts() {
     const catData = {};
     db.orders.forEach(o => o.items.forEach(i => {
         const p = db.products.find(x=>x.id==i.productId);
-        if(p) catData[p.category] = (catData[p.category]||0) + (i.price*i.qty);
+        if(p) catData[p.category] = (catData[p.category]||0) + (i.price*orderItemNetQty(i));
     }));
     charts.cat = new Chart(ctx2, {
         type: 'doughnut',
@@ -1761,13 +1772,13 @@ function generateReport() {
     let html = '';
     
     if(type==='sales') {
-        const total = filteredOrders.reduce((s,o)=>s+o.total,0);
+        const total = filteredOrders.reduce((s,o)=>s+orderNetTotal(o),0);
         const count = filteredOrders.length;
         const avg = count>0 ? total/count : 0;
-        
+
         html = `
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <div class="bg-cyan-50 p-4 rounded-xl"><p class="text-slate-500 text-sm">Jami sotuvlar</p><p class="text-2xl font-bold text-cyan-700">${formatMoney(total)}</p></div>
+                <div class="bg-cyan-50 p-4 rounded-xl"><p class="text-slate-500 text-sm">Jami sotuvlar (qaytarilganlar ayirilgan)</p><p class="text-2xl font-bold text-cyan-700">${formatMoney(total)}</p></div>
                 <div class="bg-blue-50 p-4 rounded-xl"><p class="text-slate-500 text-sm">Buyurtmalar soni</p><p class="text-2xl font-bold text-blue-700">${count}</p></div>
                 <div class="bg-purple-50 p-4 rounded-xl"><p class="text-slate-500 text-sm">O'rtacha chek</p><p class="text-2xl font-bold text-purple-700">${formatMoney(avg)}</p></div>
             </div>
@@ -1777,7 +1788,9 @@ function generateReport() {
                     <tbody class="divide-y divide-slate-100">
                         ${filteredOrders.map(o=>{
                             const c = db.customers.find(x=>x.id==o.customerId);
-                            return `<tr><td class="py-3 px-4">#${o.id.toString().slice(-6)}</td><td class="py-3 px-4">${c?escapeHtml(c.name):'Noma\'lum'}</td><td class="py-3 px-4 text-right font-medium">${formatMoney(o.total)}</td><td class="py-3 px-4 text-center"><span class="bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded">${PAYMENT_LABELS[o.payment]||o.payment}</span>${o.debtAdded>0?`<div class="text-[10px] text-red-500 mt-1">Qarz: ${formatMoney(o.debtAdded)}</div>`:''}</td><td class="py-3 px-4 text-slate-500 text-xs">${o.date.slice(0,10)} ${o.date.slice(11,16)}</td><td class="py-3 px-4 text-center"><button onclick="showReceipt(db.orders.find(x=>x.id===${o.id}))" class="text-cyan-600 hover:text-cyan-800 mr-2" title="Chek"><i class="fas fa-receipt"></i></button><button onclick="openReturnModal(${o.id})" class="text-orange-500 hover:text-orange-700" title="Qaytarish"><i class="fas fa-rotate-left"></i></button></td></tr>`;
+                            const net = orderNetTotal(o);
+                            const returnedAmount = o.total - net;
+                            return `<tr><td class="py-3 px-4">#${o.id.toString().slice(-6)}</td><td class="py-3 px-4">${c?escapeHtml(c.name):'Noma\'lum'}</td><td class="py-3 px-4 text-right font-medium">${formatMoney(net)}${returnedAmount>0?`<div class="text-[10px] text-orange-500 mt-1">Qaytarilgan: -${formatMoney(returnedAmount)}</div>`:''}</td><td class="py-3 px-4 text-center"><span class="bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded">${PAYMENT_LABELS[o.payment]||o.payment}</span>${o.debtAdded>0?`<div class="text-[10px] text-red-500 mt-1">Qarz: ${formatMoney(o.debtAdded)}</div>`:''}</td><td class="py-3 px-4 text-slate-500 text-xs">${o.date.slice(0,10)} ${o.date.slice(11,16)}</td><td class="py-3 px-4 text-center"><button onclick="showReceipt(db.orders.find(x=>x.id===${o.id}))" class="text-cyan-600 hover:text-cyan-800 mr-2" title="Chek"><i class="fas fa-receipt"></i></button><button onclick="openReturnModal(${o.id})" class="text-orange-500 hover:text-orange-700" title="Qaytarish"><i class="fas fa-rotate-left"></i></button></td></tr>`;
                         }).join('') || '<tr><td colspan="6" class="py-8 text-center text-slate-400">Ma\'lumot topilmadi</td></tr>'}
                     </tbody>
                 </table>
@@ -1786,12 +1799,12 @@ function generateReport() {
     } else if(type==='products') {
         const productSales = {};
         filteredOrders.forEach(o => o.items.forEach(i => {
-            productSales[i.name] = (productSales[i.name]||0) + i.qty;
+            productSales[i.name] = (productSales[i.name]||0) + orderItemNetQty(i);
         }));
-        const sorted = Object.entries(productSales).sort((a,b)=>b[1]-a[1]);
-        
+        const sorted = Object.entries(productSales).filter(s=>s[1]>0).sort((a,b)=>b[1]-a[1]);
+
         html = `
-            <h3 class="font-bold text-slate-800 mb-4">Eng ko'p sotilgan mahsulotlar</h3>
+            <h3 class="font-bold text-slate-800 mb-4">Eng ko'p sotilgan mahsulotlar (qaytarilganlar ayirilgan)</h3>
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead class="bg-slate-50 text-slate-500"><tr><th class="text-left py-3 px-4">#</th><th class="text-left py-3 px-4">Mahsulot</th><th class="text-right py-3 px-4">Sotilgan (dona)</th></tr></thead>
@@ -1802,8 +1815,8 @@ function generateReport() {
             </div>
         `;
     } else if(type==='profit') {
-        const totalRevenue = filteredOrders.reduce((s,o)=>s+o.total,0);
-        const totalCost = filteredOrders.reduce((s,o)=>s+o.items.reduce((is,i)=>is+(i.qty*(db.products.find(p=>p.id==i.productId)?.cost||0)),0),0);
+        const totalRevenue = filteredOrders.reduce((s,o)=>s+orderNetTotal(o),0);
+        const totalCost = filteredOrders.reduce((s,o)=>s+o.items.reduce((is,i)=>is+(orderItemNetQty(i)*(db.products.find(p=>p.id==i.productId)?.cost||0)),0),0);
         const profit = totalRevenue - totalCost;
         
         html = `
