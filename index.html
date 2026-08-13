@@ -644,30 +644,61 @@ function saveDB() {
 }
 
 let syncInFlight = false;
+// Ikkita qurilma AYNI bir vaqtda saqlasa ("poyga sharoiti"), oddiy yozish
+// birining ma'lumotini yo'qotib qo'yishi mumkin edi. Shuning uchun yozishdan
+// oldin o'qigan updated_at hali ham amaldami (hech kim orada o'zgartirmaganmi)
+// tekshiriladi (optimistic concurrency). Agar boshqa qurilma bizdan oldin
+// ulgurib yozgan bo'lsa - qaytadan o'qib, qaytadan birlashtirib, qayta
+// urinamiz (bir necha marotaba), shunda hech narsa yo'qolmaydi.
 async function pushToCloud() {
     if(!sb || syncInFlight) return;
     syncInFlight = true;
     try {
-        const { data, error } = await sb.from('app_data').select('data, updated_at').eq('id', CLOUD_ROW_ID).maybeSingle();
-        if(error) throw error;
-        const remote = (data && data.data) ? normalizeDB(data.data) : null;
+        for (let attempt = 0; attempt < 6; attempt++) {
+            const { data, error } = await sb.from('app_data').select('data, updated_at').eq('id', CLOUD_ROW_ID).maybeSingle();
+            if(error) throw error;
+            const remote = (data && data.data) ? normalizeDB(data.data) : null;
 
-        let toPush = db;
-        if(remote) {
-            const merged = mergeDb(dbBaseline || db, db, remote);
-            const changedFromLocal = JSON.stringify(merged) !== JSON.stringify(db);
-            db = merged;
-            toPush = merged;
-            if(changedFromLocal) {
-                localStorage.setItem('santexDB', JSON.stringify(db));
-                refreshCurrentPage();
+            let toPush = db;
+            let changedFromLocal = false;
+            if(remote) {
+                const merged = mergeDb(dbBaseline || db, db, remote);
+                changedFromLocal = JSON.stringify(merged) !== JSON.stringify(db);
+                db = merged;
+                toPush = merged;
             }
-        }
 
-        const { error: upErr } = await sb.from('app_data').upsert({ id: CLOUD_ROW_ID, data: toPush, updated_at: new Date().toISOString() });
-        if(upErr) throw upErr;
-        snapshotBaseline();
-        setSyncStatus('synced');
+            const newUpdatedAt = new Date().toISOString();
+            let writeOk = false;
+            if(!data) {
+                // Bulutda hali umuman qator yo'q - birinchi marta yaratamiz
+                const { error: insErr } = await sb.from('app_data').insert({ id: CLOUD_ROW_ID, data: toPush, updated_at: newUpdatedAt });
+                if(insErr && insErr.code !== '23505') throw insErr; // 23505 = boshqa qurilma bizdan oldin yaratdi, qayta urinamiz
+                writeOk = !insErr;
+            } else {
+                // Faqat hech kim orada o'zgartirmagan bo'lsa yozamiz (updated_at hali o'sha-o'sha bo'lsa)
+                const { data: updRows, error: updErr } = await sb.from('app_data')
+                    .update({ data: toPush, updated_at: newUpdatedAt })
+                    .eq('id', CLOUD_ROW_ID)
+                    .eq('updated_at', data.updated_at)
+                    .select('id');
+                if(updErr) throw updErr;
+                writeOk = !!(updRows && updRows.length > 0);
+            }
+
+            if(writeOk) {
+                if(changedFromLocal) {
+                    localStorage.setItem('santexDB', JSON.stringify(db));
+                    refreshCurrentPage();
+                }
+                snapshotBaseline();
+                setSyncStatus('synced');
+                return;
+            }
+            // Boshqa qurilma bizdan bir zum oldin yozib ulgurdi - qaytadan o'qib, qaytadan urinamiz
+            await new Promise(r => setTimeout(r, 150 + Math.random()*250));
+        }
+        throw new Error('Bir nechta urinishdan keyin ham sinxronlab bo\'lmadi (band)');
     } catch(e) {
         console.error('Cloud sync error', e);
         const msg = (e && (e.message || e.details || e.hint || JSON.stringify(e))) || 'Nomalum xato';
@@ -706,12 +737,32 @@ async function pullFromCloud() {
     return false;
 }
 
-// Boshqa qurilmadagi o'zgarishlarni bu ekranga ham olib kelish uchun
-// fon rejimida davriy (25 soniyada bir) sinxronlash.
+// Boshqa qurilma saqlagan ZAHOTI shu ekranga ham darhol xabar berish uchun
+// Supabase Realtime orqali ulanish (websocket). Ishlashi uchun bulutda
+// bir marta: alter publication supabase_realtime add table app_data;
+// ishga tushirilishi kerak (supabase-security-setup.sql'ga qarang).
+let realtimeChannel = null;
+function startRealtimeSync() {
+    if(!sb) return;
+    stopRealtimeSync();
+    try {
+        realtimeChannel = sb
+            .channel('app_data_' + CLOUD_ROW_ID)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'app_data', filter: `id=eq.${CLOUD_ROW_ID}` },
+                () => { if(!syncInFlight) pushToCloud(); })
+            .subscribe();
+    } catch(e) { console.warn('Realtime ulanmadi', e); }
+}
+function stopRealtimeSync() {
+    if(realtimeChannel && sb) { sb.removeChannel(realtimeChannel); realtimeChannel = null; }
+}
+
+// Realtime biror sababga ko'ra ishlamay qolsa ham (tarmoq, eskirgan sozlama)
+// tizim ishlashda davom etishi uchun fon rejimidagi zaxira sinxronlash.
 let periodicSyncTimer = null;
 function startPeriodicSync() {
     stopPeriodicSync();
-    periodicSyncTimer = setInterval(() => { if(!syncInFlight) pushToCloud(); }, 25000);
+    periodicSyncTimer = setInterval(() => { if(!syncInFlight) pushToCloud(); }, 15000);
 }
 function stopPeriodicSync() {
     if(periodicSyncTimer) { clearInterval(periodicSyncTimer); periodicSyncTimer = null; }
@@ -869,6 +920,7 @@ async function enterApp(user) {
 
     await pullFromCloud();
     initApp();
+    startRealtimeSync();
     startPeriodicSync();
     showToast('Xush kelibsiz, ' + currentUser.name + '!');
 }

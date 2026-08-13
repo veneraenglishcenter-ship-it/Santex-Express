@@ -86,8 +86,13 @@ create policy "app_data: authenticated update"
 -- uchun keyingi bosqichda jadvallarni alohida-alohida qilib bo'lish kerak
 -- bo'ladi (products, orders, customers... har biri o'z RLS siyosati bilan).
 
+-- 4) REALTIME (bir qurilmadagi o'zgarish boshqasida DARHOL ko'rinishi uchun) --
+-- Bo'lmasa ham tizim ishlayveradi (fon rejimida 15 soniyada bir tekshiradi),
+-- lekin bu bilan o'zgarish deyarli bir zumda (soniya ichida) ko'rinadi.
+alter publication supabase_realtime add table public.app_data;
+
 -- ============================================================================
--- 3) BIRINCHI ADMIN HISOBINI YARATISH
+-- 5) BIRINCHI ADMIN HISOBINI YARATISH
 -- ============================================================================
 -- a) Supabase Dashboard -> Authentication -> Users -> "Add user"
 --    - Email: o'zingizning ish emailingiz
