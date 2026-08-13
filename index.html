@@ -578,6 +578,62 @@ function initDB() {
     return normalizeDB(loaded);
 }
 
+// ---- Bir nechta qurilma bir vaqtda ishlaganda ma'lumot yo'qolmasligi uchun
+// "3 tomonlama birlashtirish" (3-way merge): baseline (oxirgi tasdiqlangan
+// umumiy holat), local (shu qurilmadagi joriy holat) va remote (bulutdagi
+// joriy holat) solishtiriladi. Har bir yozuv (sotuv, mahsulot, mijoz...)
+// o'z id'si bo'yicha alohida birlashtiriladi - shuning uchun bitta qurilma
+// yangi sotuv qilib, boshqasi shu payt narx o'zgartirsa, IKKALASI HAM saqlanib
+// qoladi (biri ikkinchisini "yeb qo'ymaydi").
+let dbBaseline = null;
+function snapshotBaseline() {
+    dbBaseline = JSON.parse(JSON.stringify(db));
+}
+
+const MERGE_ID_COLLECTIONS = ['products','customers','employees','campaigns','orders','returns','stockIns','debtPayments'];
+
+function mergeCollection(baseArr, localArr, remoteArr) {
+    const baseMap = new Map((baseArr||[]).map(x=>[x.id, x]));
+    const localMap = new Map((localArr||[]).map(x=>[x.id, x]));
+    const remoteMap = new Map((remoteArr||[]).map(x=>[x.id, x]));
+    const allIds = new Set([...baseMap.keys(), ...localMap.keys(), ...remoteMap.keys()]);
+    const result = [];
+    allIds.forEach(id => {
+        const base = baseMap.get(id), local = localMap.get(id), remote = remoteMap.get(id);
+        const baseStr = base ? JSON.stringify(base) : null;
+        const localStr = local ? JSON.stringify(local) : null;
+        const remoteStr = remote ? JSON.stringify(remote) : null;
+
+        if (!local && !remote) return; // ikkala tomonda ham o'chirilgan
+        if (local && !remote) {
+            // Bulutda yo'q: yo yangi (baseline ham yo'q) - saqlaymiz,
+            // yo boshqa qurilma o'chirgan va biz o'zgartirmagan bo'lsak - o'chirilgan holda qoldiramiz
+            if (!base || localStr !== baseStr) result.push(local);
+            return;
+        }
+        if (!local && remote) {
+            // Bizda yo'q: yo yangi bulutdan kelgan, yo biz o'chirdik va ular o'zgartirmagan
+            if (!base || remoteStr !== baseStr) result.push(remote);
+            return;
+        }
+        // Ikkalasida ham bor
+        if (localStr === remoteStr) { result.push(local); return; }
+        if (localStr === baseStr) { result.push(remote); return; } // biz o'zgartirmadik - ularnikini olamiz
+        if (remoteStr === baseStr) { result.push(local); return; } // ular o'zgartirmadi - biznikini olamiz
+        result.push(local); // ikkalasi ham o'zgartirgan (kamdan-kam) - o'z tomonimizni ustun qo'yamiz
+    });
+    return result;
+}
+
+function mergeDb(baseline, local, remote) {
+    const merged = {};
+    MERGE_ID_COLLECTIONS.forEach(key => {
+        merged[key] = mergeCollection((baseline&&baseline[key])||[], (local&&local[key])||[], (remote&&remote[key])||[]);
+    });
+    merged.categories = Array.from(new Set([...(local.categories||[]), ...(remote.categories||[])]));
+    return normalizeDB(merged);
+}
+
 let cloudSyncTimer = null;
 function saveDB() {
     localStorage.setItem('santexDB', JSON.stringify(db));
@@ -587,19 +643,40 @@ function saveDB() {
     cloudSyncTimer = setTimeout(pushToCloud, 1200);
 }
 
+let syncInFlight = false;
 async function pushToCloud() {
-    if(!sb) return;
+    if(!sb || syncInFlight) return;
+    syncInFlight = true;
     try {
-        const { error } = await sb.from('app_data').upsert({ id: CLOUD_ROW_ID, data: db, updated_at: new Date().toISOString() });
+        const { data, error } = await sb.from('app_data').select('data, updated_at').eq('id', CLOUD_ROW_ID).maybeSingle();
         if(error) throw error;
+        const remote = (data && data.data) ? normalizeDB(data.data) : null;
+
+        let toPush = db;
+        if(remote) {
+            const merged = mergeDb(dbBaseline || db, db, remote);
+            const changedFromLocal = JSON.stringify(merged) !== JSON.stringify(db);
+            db = merged;
+            toPush = merged;
+            if(changedFromLocal) {
+                localStorage.setItem('santexDB', JSON.stringify(db));
+                refreshCurrentPage();
+            }
+        }
+
+        const { error: upErr } = await sb.from('app_data').upsert({ id: CLOUD_ROW_ID, data: toPush, updated_at: new Date().toISOString() });
+        if(upErr) throw upErr;
+        snapshotBaseline();
         setSyncStatus('synced');
     } catch(e) {
-        console.error('Cloud push error', e);
+        console.error('Cloud sync error', e);
         const msg = (e && (e.message || e.details || e.hint || JSON.stringify(e))) || 'Nomalum xato';
         setSyncStatus('error');
         const el = document.getElementById('syncStatus');
         if(el) el.title = msg;
         showToast('Bulutga saqlashda xato: ' + msg, 'error');
+    } finally {
+        syncInFlight = false;
     }
 }
 
@@ -612,10 +689,12 @@ async function pullFromCloud() {
         if(data && data.data) {
             db = normalizeDB(data.data);
             localStorage.setItem('santexDB', JSON.stringify(db));
+            snapshotBaseline();
             setSyncStatus('synced');
             return true;
         } else {
             // Bulutda hali ma'lumot yo'q - lokal ma'lumotni birinchi marta yuklaymiz
+            snapshotBaseline();
             await pushToCloud();
         }
     } catch(e) {
@@ -625,6 +704,17 @@ async function pullFromCloud() {
         showToast('Bulutdan yuklashda xato: ' + msg, 'error');
     }
     return false;
+}
+
+// Boshqa qurilmadagi o'zgarishlarni bu ekranga ham olib kelish uchun
+// fon rejimida davriy (25 soniyada bir) sinxronlash.
+let periodicSyncTimer = null;
+function startPeriodicSync() {
+    stopPeriodicSync();
+    periodicSyncTimer = setInterval(() => { if(!syncInFlight) pushToCloud(); }, 25000);
+}
+function stopPeriodicSync() {
+    if(periodicSyncTimer) { clearInterval(periodicSyncTimer); periodicSyncTimer = null; }
 }
 
 let db = initDB();
@@ -779,6 +869,7 @@ async function enterApp(user) {
 
     await pullFromCloud();
     initApp();
+    startPeriodicSync();
     showToast('Xush kelibsiz, ' + currentUser.name + '!');
 }
 
