@@ -276,11 +276,19 @@
 
             <!-- INVENTORY -->
             <div id="page-inventory" class="page">
-                <div class="flex justify-between items-center mb-6">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
                     <h1 class="text-2xl font-bold text-slate-800">Omborxona</h1>
-                    <button onclick="openProductModal()" class="admin-only bg-gradient-to-r from-cyan-600 to-blue-600 text-white px-5 py-2.5 rounded-xl font-medium hover:shadow-lg transition flex items-center gap-2">
-                        <i class="fas fa-plus"></i> Mahsulot qo'shish
-                    </button>
+                    <div class="flex flex-wrap gap-2">
+                        <button onclick="openCategoryManagerModal()" class="admin-only px-4 py-2.5 border border-slate-200 rounded-xl font-medium hover:bg-slate-50 text-slate-600 flex items-center gap-2 text-sm">
+                            <i class="fas fa-tags"></i> Kategoriyalar
+                        </button>
+                        <button onclick="openKirimModal()" class="admin-only bg-white border border-cyan-300 text-cyan-700 px-4 py-2.5 rounded-xl font-medium hover:bg-cyan-50 flex items-center gap-2 text-sm">
+                            <i class="fas fa-truck-loading"></i> Kirim qilish
+                        </button>
+                        <button onclick="openProductModal()" class="admin-only bg-gradient-to-r from-cyan-600 to-blue-600 text-white px-5 py-2.5 rounded-xl font-medium hover:shadow-lg transition flex items-center gap-2 text-sm">
+                            <i class="fas fa-plus"></i> Mahsulot qo'shish
+                        </button>
+                    </div>
                 </div>
                 <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
                     <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
@@ -298,6 +306,16 @@
                     <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
                         <p class="text-slate-400 text-xs sm:text-sm mb-1">Kam qolgan</p>
                         <p id="invStatLow" class="text-lg sm:text-2xl font-bold text-red-600 truncate">0</p>
+                    </div>
+                </div>
+                <div class="admin-only grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+                    <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+                        <h3 class="font-bold text-slate-800 mb-3 text-sm"><i class="fas fa-fire text-orange-500 mr-1.5"></i>Tez sotilayotgan (oxirgi 30 kun)</h3>
+                        <div id="fastMoversList" class="space-y-2"></div>
+                    </div>
+                    <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+                        <h3 class="font-bold text-slate-800 mb-3 text-sm"><i class="fas fa-hourglass-half text-slate-400 mr-1.5"></i>Sekin sotilayotgan / ko'p turgan</h3>
+                        <div id="slowMoversList" class="space-y-2"></div>
                     </div>
                 </div>
                 <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
@@ -497,7 +515,8 @@ const defaultData = {
         {id:1, name:'Yozgi chegirma', type:'chegirma', content:'Barcha kranlarga 15% chegirma', date:'2026-07-20', status:'active'},
         {id:2, name:'Yangi mijozlar', type:'sms', content:'Hurmatli mijoz, bizda yangi kollektorlar keldi!', date:'2026-07-22', status:'sent'},
     ],
-    debtPayments: []
+    debtPayments: [],
+    stockIns: []
 };
 
 function resetDemoData() {
@@ -542,6 +561,7 @@ function normalizeDB(loaded) {
     }
     if (loaded.debtPayments === undefined) loaded.debtPayments = [];
     if (loaded.returns === undefined) loaded.returns = [];
+    if (loaded.stockIns === undefined) loaded.stockIns = [];
     (loaded.orders||[]).forEach(o => {
         if (o.paid === undefined) o.paid = o.payment === 'nasiya' ? 0 : o.total;
         if (o.debtAdded === undefined) o.debtAdded = o.payment === 'nasiya' ? o.total : 0;
@@ -1303,6 +1323,291 @@ function renderInventory() {
             </td>
         </tr>
     `).join('');
+
+    renderInventoryVelocity();
+}
+
+// Har bir mahsulot uchun oxirgi 30 kunda sotilgan dona sonini va oxirgi
+// sotuv sanasini hisoblaydi - "tez sotilayotgan / ko'p turgan" statistikasi uchun.
+function computeProductVelocity() {
+    const now = new Date();
+    const stats = {};
+    db.orders.forEach(o => {
+        const d = new Date(o.date);
+        const daysAgo = (now - d) / (1000*60*60*24);
+        o.items.forEach(i => {
+            const netQty = orderItemNetQty(i);
+            if(!stats[i.productId]) stats[i.productId] = {qtySold30d: 0, lastSaleDate: null};
+            if(netQty > 0 && daysAgo <= 30) stats[i.productId].qtySold30d += netQty;
+            if(netQty > 0 && (!stats[i.productId].lastSaleDate || d > stats[i.productId].lastSaleDate)) {
+                stats[i.productId].lastSaleDate = d;
+            }
+        });
+    });
+    return stats;
+}
+
+function renderInventoryVelocity() {
+    const fastEl = document.getElementById('fastMoversList');
+    const slowEl = document.getElementById('slowMoversList');
+    if(!fastEl || !slowEl) return;
+    if(!currentUser || currentUser.role !== 'admin') return;
+
+    const velocity = computeProductVelocity();
+    const now = new Date();
+
+    const fast = db.products
+        .map(p => ({ p, qty: (velocity[p.id]?.qtySold30d) || 0 }))
+        .filter(x => x.qty > 0)
+        .sort((a,b) => b.qty - a.qty)
+        .slice(0, 5);
+
+    fastEl.innerHTML = fast.map(x => `
+        <div class="flex justify-between items-center text-sm">
+            <span class="text-slate-700 truncate mr-2">${escapeHtml(x.p.name)}</span>
+            <span class="text-orange-600 font-bold whitespace-nowrap">${x.qty} dona</span>
+        </div>
+    `).join('') || '<p class="text-slate-400 text-xs">Oxirgi 30 kunda sotuv yo\'q</p>';
+
+    const slow = db.products
+        .filter(p => p.stock > 0)
+        .map(p => {
+            const v = velocity[p.id];
+            const lastSale = v && v.lastSaleDate ? v.lastSaleDate : null;
+            const daysSince = lastSale ? Math.floor((now - lastSale) / (1000*60*60*24)) : null;
+            return { p, daysSince, tiedUpValue: p.stock * p.cost };
+        })
+        .filter(x => x.daysSince === null || x.daysSince > 30)
+        .sort((a,b) => b.tiedUpValue - a.tiedUpValue)
+        .slice(0, 5);
+
+    slowEl.innerHTML = slow.map(x => `
+        <div class="flex justify-between items-center text-sm gap-2">
+            <span class="text-slate-700 truncate">${escapeHtml(x.p.name)}</span>
+            <span class="text-slate-400 text-xs whitespace-nowrap">${x.daysSince===null?'sotilmagan':x.daysSince+' kun'}</span>
+            <span class="text-slate-600 font-bold whitespace-nowrap">${formatMoney(x.tiedUpValue)}</span>
+        </div>
+    `).join('') || '<p class="text-slate-400 text-xs">Barcha mahsulotlar yaxshi sotilyapti</p>';
+}
+
+// ==================== KATEGORIYALARNI BOSHQARISH ====================
+function openCategoryManagerModal() {
+    if(!requireAdmin()) return;
+    openModal(`
+        <div class="p-6">
+            <h3 class="text-xl font-bold text-slate-800 mb-4"><i class="fas fa-tags mr-2 text-cyan-600"></i>Kategoriyalarni boshqarish</h3>
+            <div id="categoryManagerList" class="space-y-2 max-h-80 overflow-y-auto mb-4"></div>
+            <div class="flex gap-2">
+                <input type="text" id="newCategoryName" placeholder="Yangi kategoriya nomi" class="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-cyan-500 outline-none" onkeydown="if(event.key==='Enter') addCategoryFromManager()">
+                <button onclick="addCategoryFromManager()" class="px-4 py-2 bg-cyan-600 text-white rounded-lg text-sm hover:bg-cyan-700">Qo'shish</button>
+            </div>
+            <button onclick="closeModal()" class="w-full mt-4 border border-slate-200 py-2 rounded-lg hover:bg-slate-50">Yopish</button>
+        </div>
+    `);
+    renderCategoryManagerList();
+}
+
+function renderCategoryManagerList() {
+    const el = document.getElementById('categoryManagerList');
+    if(!el) return;
+    el.innerHTML = db.categories.map((cat, idx) => {
+        const count = db.products.filter(p=>p.category===cat).length;
+        return `
+        <div class="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg gap-2">
+            <div class="flex-1 min-w-0">
+                <input type="text" value="${escapeHtml(cat)}" onchange="renameCategoryByIndex(${idx}, this.value)" class="w-full bg-transparent font-medium text-sm border-b border-transparent focus:border-cyan-400 outline-none">
+                <p class="text-xs text-slate-400">${count} ta mahsulot</p>
+            </div>
+            <button onclick="deleteCategoryByIndex(${idx})" class="text-red-500 hover:text-red-700 flex-shrink-0"><i class="fas fa-trash"></i></button>
+        </div>`;
+    }).join('') || '<p class="text-slate-400 text-sm text-center py-4">Kategoriya yo\'q</p>';
+}
+
+function addCategoryFromManager() {
+    const input = document.getElementById('newCategoryName');
+    const name = input.value.trim();
+    if(!name) { showToast('Kategoriya nomini kiriting!', 'error'); return; }
+    if(db.categories.includes(name)) { showToast('Bunday kategoriya allaqachon bor!', 'error'); return; }
+    db.categories.push(name);
+    saveDB();
+    input.value = '';
+    renderCategoryManagerList();
+    showToast('Kategoriya qo\'shildi!');
+}
+
+function renameCategoryByIndex(idx, newNameRaw) {
+    const newName = (newNameRaw||'').trim();
+    const oldName = db.categories[idx];
+    if(!newName || newName === oldName) { renderCategoryManagerList(); return; }
+    if(db.categories.includes(newName)) {
+        showToast('Bunday kategoriya allaqachon bor!', 'error');
+        renderCategoryManagerList();
+        return;
+    }
+    db.categories[idx] = newName;
+    db.products.forEach(p => { if(p.category === oldName) p.category = newName; });
+    saveDB();
+    renderCategoryManagerList();
+    renderInventory();
+    showToast('Kategoriya nomi yangilandi!');
+}
+
+// Kategoriyani o'chirish - agar shu kategoriyada mahsulotlar bo'lsa, ma'lumot
+// yo'qolmasligi uchun avval ularni boshqa kategoriyaga ko'chirishni so'raymiz.
+function deleteCategoryByIndex(idx) {
+    const cat = db.categories[idx];
+    const affected = db.products.filter(p=>p.category===cat);
+    if(affected.length === 0) {
+        if(!confirm(`"${cat}" kategoriyasini o'chirishni tasdiqlaysizmi?`)) return;
+        db.categories.splice(idx,1);
+        saveDB();
+        renderCategoryManagerList();
+        showToast('Kategoriya o\'chirildi!');
+        return;
+    }
+    const others = db.categories.filter(c=>c!==cat);
+    if(others.length === 0) {
+        showToast('Bu yagona kategoriya - avval boshqa kategoriya yarating!', 'error');
+        return;
+    }
+    const el = document.getElementById('categoryManagerList');
+    el.innerHTML = `
+        <div class="p-3 bg-orange-50 border border-orange-200 rounded-lg text-sm">
+            <p class="mb-2">"<b>${escapeHtml(cat)}</b>" kategoriyasida <b>${affected.length}</b> ta mahsulot bor. Ularni qayerga ko'chiramiz?</p>
+            <select id="reassignCategorySelect" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm mb-2 bg-white">
+                ${others.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('')}
+            </select>
+            <div class="flex gap-2">
+                <button onclick="reassignAndDeleteCategory(${idx})" class="flex-1 bg-red-500 text-white py-2 rounded-lg text-sm hover:bg-red-600">Ko'chirib, o'chirish</button>
+                <button onclick="renderCategoryManagerList()" class="flex-1 border border-slate-200 py-2 rounded-lg text-sm hover:bg-slate-50">Bekor qilish</button>
+            </div>
+        </div>
+    `;
+}
+
+function reassignAndDeleteCategory(idx) {
+    const cat = db.categories[idx];
+    const target = document.getElementById('reassignCategorySelect').value;
+    db.products.forEach(p => { if(p.category===cat) p.category = target; });
+    db.categories.splice(idx,1);
+    saveDB();
+    renderCategoryManagerList();
+    renderInventory();
+    showToast(`Mahsulotlar "${target}"ga ko'chirildi, kategoriya o'chirildi!`);
+}
+
+// ==================== KIRIM QILISH (STOCK-IN) ====================
+let kirimRows = [];
+
+function openKirimModal() {
+    if(!requireAdmin()) return;
+    kirimRows = [{ name:'', category: db.categories[0]||'', qty:'', price:'', cost:'' }];
+    openModal(`
+        <div class="p-6">
+            <h3 class="text-xl font-bold text-slate-800 mb-1"><i class="fas fa-truck-loading mr-2 text-cyan-600"></i>Kirim qilish</h3>
+            <p class="text-xs text-slate-400 mb-4">Mavjud mahsulot nomini yozsangiz - qoldiqqa QO'SHILADI (eski ma'lumot o'chmaydi). Yangi nom yozsangiz - yangi mahsulot yaratiladi.</p>
+            <datalist id="existingProductNames">
+                ${db.products.map(p=>`<option value="${escapeHtml(p.name)}">`).join('')}
+            </datalist>
+            <div class="grid grid-cols-2 gap-3 mb-3">
+                <div>
+                    <label class="text-xs text-slate-500 block mb-1">Sana</label>
+                    <input type="date" id="kirimDate" value="${new Date().toISOString().split('T')[0]}" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm">
+                </div>
+                <div>
+                    <label class="text-xs text-slate-500 block mb-1">Yetkazib beruvchi (ixtiyoriy)</label>
+                    <input type="text" id="kirimSupplier" placeholder="Masalan: XXX savdo" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm">
+                </div>
+            </div>
+            <div id="kirimRowsContainer" class="space-y-3 mb-3 max-h-[45vh] overflow-y-auto"></div>
+            <button onclick="addKirimRow()" class="w-full mb-4 border border-dashed border-cyan-300 text-cyan-600 py-2 rounded-lg text-sm hover:bg-cyan-50">
+                <i class="fas fa-plus mr-1"></i> Yana mahsulot qo'shish
+            </button>
+            <div class="flex gap-3">
+                <button onclick="processKirim()" class="flex-1 bg-cyan-600 text-white py-2.5 rounded-lg font-medium hover:bg-cyan-700 transition">Kirim qilish</button>
+                <button onclick="closeModal()" class="flex-1 border border-slate-200 py-2.5 rounded-lg hover:bg-slate-50">Bekor qilish</button>
+            </div>
+        </div>
+    `);
+    renderKirimRows();
+}
+
+function renderKirimRows() {
+    const el = document.getElementById('kirimRowsContainer');
+    if(!el) return;
+    el.innerHTML = kirimRows.map((row, idx) => `
+        <div class="border border-slate-200 rounded-xl p-3 space-y-2 relative">
+            ${kirimRows.length > 1 ? `<button onclick="removeKirimRow(${idx})" class="absolute top-2 right-2 text-red-400 hover:text-red-600"><i class="fas fa-times"></i></button>` : ''}
+            <input type="text" list="existingProductNames" placeholder="Mahsulot nomi" value="${escapeHtml(row.name)}" onchange="updateKirimRow(${idx},'name',this.value)" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm pr-8">
+            <div class="grid grid-cols-2 gap-2">
+                <select onchange="updateKirimRow(${idx},'category',this.value)" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white">
+                    ${db.categories.map(c=>`<option value="${escapeHtml(c)}" ${row.category===c?'selected':''}>${escapeHtml(c)}</option>`).join('')}
+                </select>
+                <input type="number" min="1" placeholder="Miqdor" value="${row.qty}" onchange="updateKirimRow(${idx},'qty',this.value)" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm">
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <input type="number" min="0" placeholder="Sotish narxi (bo'sh=o'zgarmaydi)" value="${row.price}" onchange="updateKirimRow(${idx},'price',this.value)" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm">
+                <input type="number" min="0" placeholder="Tan narxi (bo'sh=o'zgarmaydi)" value="${row.cost}" onchange="updateKirimRow(${idx},'cost',this.value)" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm">
+            </div>
+        </div>
+    `).join('');
+}
+
+function updateKirimRow(idx, field, value) {
+    if(!kirimRows[idx]) return;
+    kirimRows[idx][field] = value;
+}
+
+function addKirimRow() {
+    kirimRows.push({ name:'', category: db.categories[0]||'', qty:'', price:'', cost:'' });
+    renderKirimRows();
+}
+
+function removeKirimRow(idx) {
+    kirimRows.splice(idx,1);
+    renderKirimRows();
+}
+
+function processKirim() {
+    const date = document.getElementById('kirimDate').value || new Date().toISOString().split('T')[0];
+    const supplier = document.getElementById('kirimSupplier').value.trim();
+
+    const items = [];
+    let newCount = 0, updatedCount = 0;
+
+    for(const row of kirimRows) {
+        const name = (row.name||'').trim();
+        const qty = parseInt(row.qty)||0;
+        if(!name || qty <= 0) continue;
+
+        let product = db.products.find(p=>p.name.toLowerCase()===name.toLowerCase());
+        if(product) {
+            product.stock += qty;
+            if(row.price !== '' && row.price !== undefined) product.price = parseInt(row.price)||product.price;
+            if(row.cost !== '' && row.cost !== undefined) product.cost = parseInt(row.cost)||product.cost;
+            updatedCount++;
+            items.push({productId: product.id, name: product.name, qty, cost: product.cost, isNew:false});
+        } else {
+            const newId = Math.max(...db.products.map(x=>x.id),0)+1;
+            const category = row.category || db.categories[0] || 'Boshqa';
+            const price = parseInt(row.price)||0;
+            const cost = parseInt(row.cost)||0;
+            product = {id:newId, name, category, price, cost, stock: qty, barcode: 'KIR'+newId, minStock: 5};
+            db.products.push(product);
+            newCount++;
+            items.push({productId: newId, name, qty, cost, isNew:true});
+        }
+    }
+
+    if(items.length === 0) { showToast('Kamida bitta mahsulot va miqdorini kiriting!', 'error'); return; }
+
+    db.stockIns = db.stockIns || [];
+    db.stockIns.push({ id: Date.now(), date, supplier, items });
+
+    saveDB();
+    closeModal();
+    renderInventory();
+    showToast(`Kirim qilindi: ${updatedCount} ta yangilandi, ${newCount} ta yangi mahsulot qo'shildi!`);
 }
 
 function openProductModal(editId) {
