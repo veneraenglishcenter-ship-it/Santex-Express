@@ -18,6 +18,7 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -232,6 +233,9 @@
                                 <input type="text" id="posSearch" placeholder="Mahsulot qidirish..." oninput="filterPosProducts()" class="w-full pl-10 pr-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500 outline-none">
                             </div>
                             <select id="posCategory" onchange="filterPosProducts()" class="w-32 sm:w-auto flex-shrink-0 px-2 sm:px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500 outline-none bg-white text-sm"></select>
+                            <button onclick="openBarcodeScannerModal()" class="flex-shrink-0 px-3 sm:px-4 py-2.5 border border-cyan-300 text-cyan-700 rounded-xl hover:bg-cyan-50 text-sm font-medium whitespace-nowrap" title="Shtrix-kod skaner">
+                                <i class="fas fa-barcode"></i><span class="hidden sm:inline ml-1">Skaner</span>
+                            </button>
                             <button onclick="openReturnModal()" class="flex-shrink-0 px-3 sm:px-4 py-2.5 border border-orange-300 text-orange-600 rounded-xl hover:bg-orange-50 text-sm font-medium whitespace-nowrap" title="Mahsulot qaytarish (vozvrat)">
                                 <i class="fas fa-rotate-left"></i><span class="hidden sm:inline ml-1">Qaytarish</span>
                             </button>
@@ -458,6 +462,7 @@
                         <option value="profit">Foyda</option>
                         <option value="returns">Qaytarishlar</option>
                         <option value="debtors">Qarzdorlar</option>
+                        <option value="audit">Audit jurnal</option>
                     </select>
                     <button onclick="generateReport()" class="bg-cyan-600 text-white px-6 py-2 rounded-lg hover:bg-cyan-700 transition"><i class="fas fa-filter mr-1"></i> Filtrlash</button>
                     <button onclick="printReport()" class="px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600"><i class="fas fa-print mr-1"></i> Chop etish</button>
@@ -528,7 +533,8 @@ const defaultData = {
         {id:2, name:'Yangi mijozlar', type:'sms', content:'Hurmatli mijoz, bizda yangi kollektorlar keldi!', date:'2026-07-22', status:'sent'},
     ],
     debtPayments: [],
-    stockIns: []
+    stockIns: [],
+    auditLog: []
 };
 
 function resetDemoData() {
@@ -574,6 +580,7 @@ function normalizeDB(loaded) {
     if (loaded.debtPayments === undefined) loaded.debtPayments = [];
     if (loaded.returns === undefined) loaded.returns = [];
     if (loaded.stockIns === undefined) loaded.stockIns = [];
+    if (loaded.auditLog === undefined) loaded.auditLog = [];
     (loaded.customers||[]).forEach(c => {
         if (c.debtDueDate === undefined) c.debtDueDate = null;
         if (c.debt <= 0) c.debtDueDate = null;
@@ -606,7 +613,7 @@ function snapshotBaseline() {
     dbBaseline = JSON.parse(JSON.stringify(db));
 }
 
-const MERGE_ID_COLLECTIONS = ['products','customers','employees','campaigns','orders','returns','stockIns','debtPayments'];
+const MERGE_ID_COLLECTIONS = ['products','customers','employees','campaigns','orders','returns','stockIns','debtPayments','auditLog'];
 
 function mergeCollection(baseArr, localArr, remoteArr) {
     const baseMap = new Map((baseArr||[]).map(x=>[x.id, x]));
@@ -801,6 +808,21 @@ function requireAdmin() {
     return true;
 }
 
+// Muhim amallarni (narx o'zgartirish, o'chirish...) kim, qachon bajargani
+// haqida yozuv qoldiradi - keyinchalik muammo chiqsa sababini topish uchun.
+function logAudit(action, details) {
+    db.auditLog = db.auditLog || [];
+    db.auditLog.push({
+        id: Date.now() + Math.random(),
+        date: new Date().toISOString(),
+        userName: currentUser ? currentUser.name : 'Noma\'lum',
+        userRole: currentUser ? currentUser.role : '',
+        action,
+        details
+    });
+    if(db.auditLog.length > 500) db.auditLog = db.auditLog.slice(-500);
+}
+
 // Rolga qarab interfeys elementlarini ko'rsatish/yashirish
 function applyRoleUI() {
     const isAdmin = currentUser && currentUser.role === 'admin';
@@ -840,6 +862,7 @@ function showToast(msg, type='success') {
     setTimeout(() => { el.classList.add('translate-y-10','opacity-0'); setTimeout(()=>el.remove(),300); }, duration);
 }
 function openModal(html) {
+    stopBarcodeScanner(); // boshqa modal ochilsa, kamera (agar yonib turgan bo'lsa) o'chiriladi
     const overlay = document.getElementById('modalOverlay');
     const content = document.getElementById('modalContent');
     content.innerHTML = html;
@@ -847,6 +870,7 @@ function openModal(html) {
     setTimeout(() => { content.classList.remove('scale-95','opacity-0'); content.classList.add('scale-100','opacity-100'); }, 10);
 }
 function closeModal() {
+    stopBarcodeScanner(); // modal qanday yopilishidan qat'iy nazar kamera albatta o'chadi
     const overlay = document.getElementById('modalOverlay');
     const content = document.getElementById('modalContent');
     content.classList.remove('scale-100','opacity-100');
@@ -1114,6 +1138,69 @@ function addToCart(pid) {
         cart.push({productId:pid, name:p.name, price:p.price, qty:1, stock:p.stock});
     }
     renderCart();
+}
+
+// ==================== SHTRIX-KOD SKANER ====================
+let activeHtml5QrScanner = null;
+
+function stopBarcodeScanner() {
+    if(!activeHtml5QrScanner) return;
+    const scanner = activeHtml5QrScanner;
+    activeHtml5QrScanner = null;
+    scanner.stop().then(() => scanner.clear()).catch(() => {});
+}
+
+function openBarcodeScannerModal() {
+    if(typeof Html5Qrcode === 'undefined') {
+        showToast('Skaner kutubxonasi yuklanmadi, internetni tekshiring!', 'error');
+        return;
+    }
+    openModal(`
+        <div class="p-6">
+            <h3 class="text-xl font-bold text-slate-800 mb-3"><i class="fas fa-barcode mr-2 text-cyan-600"></i>Shtrix-kod skaner</h3>
+            <div id="barcodeReaderArea" class="rounded-xl overflow-hidden bg-black mb-3" style="min-height:260px;"></div>
+            <p id="scannerStatus" class="text-xs text-slate-500 text-center mb-3 min-h-[16px]">Kamerani mahsulot shtrix-kodiga qarating...</p>
+            <button onclick="closeModal()" class="w-full border border-slate-200 py-2 rounded-lg hover:bg-slate-50">Tugatish</button>
+        </div>
+    `);
+    startBarcodeScanner();
+}
+
+function startBarcodeScanner() {
+    let lastCode = null, lastTime = 0;
+    activeHtml5QrScanner = new Html5Qrcode('barcodeReaderArea');
+    activeHtml5QrScanner.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 250, height: 150 } },
+        (decodedText) => {
+            const now = Date.now();
+            // Bir xil kodni kamera oldida ushlab tursak, ketma-ket bir necha marta
+            // qo'shib yubormaslik uchun 2 soniya kutamiz
+            if(decodedText === lastCode && now - lastTime < 2000) return;
+            lastCode = decodedText; lastTime = now;
+            handleScannedBarcode(decodedText);
+        },
+        () => {} // har bir kadrda kod topilmasa xato chiqarmaymiz, doim urinib turadi
+    ).catch(err => {
+        console.error('Kamera ochilmadi', err);
+        activeHtml5QrScanner = null;
+        const st = document.getElementById('scannerStatus');
+        if(st) st.textContent = 'Kameraga ruxsat berilmadi yoki kamera topilmadi.';
+        showToast('Kamerani ochib bo\'lmadi — brauzerda kameraga ruxsat berilganini tekshiring', 'error');
+    });
+}
+
+function handleScannedBarcode(code) {
+    const p = db.products.find(x=>x.barcode === code);
+    const st = document.getElementById('scannerStatus');
+    if(p) {
+        addToCart(p.id);
+        if(st) st.innerHTML = `<span class="text-green-600 font-medium"><i class="fas fa-check-circle"></i> ${escapeHtml(p.name)} qo'shildi</span>`;
+        showToast(`${p.name} savatga qo'shildi!`);
+    } else {
+        if(st) st.innerHTML = `<span class="text-red-500"><i class="fas fa-times-circle"></i> Kod topilmadi: ${escapeHtml(code)}</span>`;
+        showToast('Bu shtrix-kod bo\'yicha mahsulot topilmadi: ' + code, 'error');
+    }
 }
 
 function renderCart() {
@@ -1627,6 +1714,7 @@ function deleteCategoryByIndex(idx) {
     const affected = db.products.filter(p=>p.category===cat);
     if(affected.length === 0) {
         if(!confirm(`"${cat}" kategoriyasini o'chirishni tasdiqlaysizmi?`)) return;
+        logAudit('Kategoriya o\'chirildi', cat);
         db.categories.splice(idx,1);
         saveDB();
         renderCategoryManagerList();
@@ -1656,6 +1744,7 @@ function deleteCategoryByIndex(idx) {
 function reassignAndDeleteCategory(idx) {
     const cat = db.categories[idx];
     const target = document.getElementById('reassignCategorySelect').value;
+    logAudit('Kategoriya o\'chirildi', `${cat} (mahsulotlar "${target}"ga ko'chirildi)`);
     db.products.forEach(p => { if(p.category===cat) p.category = target; });
     db.categories.splice(idx,1);
     saveDB();
@@ -1837,7 +1926,12 @@ function saveProduct(editId) {
 
     if(editId && editId!=='null') {
         const p = db.products.find(x=>x.id===editId);
-        if(p) { Object.assign(p, {name, category, price, cost, stock, minStock, barcode}); }
+        if(p) {
+            if(p.price !== price || p.cost !== cost) {
+                logAudit('Mahsulot narxi o\'zgartirildi', `${name}: narx ${p.price}→${price} so'm, tan narx ${p.cost}→${cost} so'm`);
+            }
+            Object.assign(p, {name, category, price, cost, stock, minStock, barcode});
+        }
     } else {
         const newId = Math.max(...db.products.map(x=>x.id),0)+1;
         db.products.push({id:newId, name, category, price, cost, stock, barcode, minStock});
@@ -1848,6 +1942,8 @@ function saveProduct(editId) {
 function deleteProduct(id) {
     if(!requireAdmin()) return;
     if(!confirm('Rostdan ham o\'chirmoqchimisiz?')) return;
+    const p = db.products.find(x=>x.id===id);
+    if(p) logAudit('Mahsulot o\'chirildi', p.name);
     db.products = db.products.filter(x=>x.id!==id);
     saveDB(); renderInventory(); showToast('O\'chirildi!');
 }
@@ -1995,7 +2091,12 @@ function openCustomerModal(editId) {
 
     if(editId && editId!=='null') {
         const c = db.customers.find(x=>x.id===editId);
-        if(c) { Object.assign(c, {name, phone, address, debt, debtDueDate}); }
+        if(c) {
+            if(c.debt !== debt) {
+                logAudit('Mijoz qarzi qo\'lda o\'zgartirildi', `${name}: ${c.debt}→${debt} so'm`);
+            }
+            Object.assign(c, {name, phone, address, debt, debtDueDate});
+        }
     } else {
         const newId = Math.max(...db.customers.map(x=>x.id),0)+1;
         db.customers.push({id:newId, name, phone, address, debt, debtDueDate, totalPurchases:0});
@@ -2008,6 +2109,8 @@ function editCustomer(id) { openCustomerModal(id); }
 function deleteCustomer(id) {
     if(!requireAdmin()) return;
     if(!confirm('Rostdan ham o\'chirmoqchimisiz?')) return;
+    const c = db.customers.find(x=>x.id===id);
+    if(c) logAudit('Mijoz o\'chirildi', c.name + (c.debt>0?` (qarzi bor edi: ${formatMoney(c.debt)})`:''));
     db.customers = db.customers.filter(x=>x.id!==id);
     saveDB(); renderCRM(); showToast('Mijoz o\'chirildi!');
 }
@@ -2146,6 +2249,8 @@ function saveCampaign() {
 function deleteCampaign(id) {
     if(!requireAdmin()) return;
     if(!confirm('Rostdan ham o\'chirmoqchimisiz?')) return;
+    const camp = db.campaigns.find(x=>x.id===id);
+    if(camp) logAudit('Kampaniya o\'chirildi', camp.name);
     db.campaigns = db.campaigns.filter(x=>x.id!==id);
     saveDB(); renderMarketing(); showToast('O\'chirildi!');
 }
@@ -2263,7 +2368,12 @@ function saveEmployee(editId) {
     
     if(editId && editId!=='null') {
         const e = db.employees.find(x=>x.id===editId);
-        if(e) { Object.assign(e, {name, role, phone, salary, hireDate}); }
+        if(e) {
+            if(e.salary !== salary) {
+                logAudit('Xodim oyligi o\'zgartirildi', `${name}: ${e.salary}→${salary} so'm`);
+            }
+            Object.assign(e, {name, role, phone, salary, hireDate});
+        }
     } else {
         const newId = Math.max(...db.employees.map(x=>x.id),0)+1;
         db.employees.push({id:newId, name, role, phone, salary, hireDate, attendanceDate:null, checkIn:null, checkOut:null, attendanceLog:[]});
@@ -2274,6 +2384,8 @@ function saveEmployee(editId) {
 function deleteEmployee(id) {
     if(!requireAdmin()) return;
     if(!confirm('Rostdan ham o\'chirmoqchimisiz?')) return;
+    const e = db.employees.find(x=>x.id===id);
+    if(e) logAudit('Xodim o\'chirildi', e.name);
     db.employees = db.employees.filter(x=>x.id!==id);
     saveDB(); renderEmployees(); showToast('Xodim o\'chirildi!');
 }
@@ -2430,6 +2542,32 @@ function generateReport() {
                 </table>
             </div>
         `;
+    } else if(type==='audit') {
+        const filteredAudit = (db.auditLog||[]).filter(a => {
+            const d = new Date(a.date);
+            return d >= fromDate && d <= toDate;
+        }).sort((a,b)=>new Date(b.date)-new Date(a.date));
+
+        html = `
+            <div class="grid grid-cols-1 gap-4 mb-6">
+                <div class="bg-slate-50 p-4 rounded-xl"><p class="text-slate-500 text-sm">Jami yozuvlar</p><p class="text-2xl font-bold text-slate-700">${filteredAudit.length}</p></div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-slate-50 text-slate-500"><tr><th class="text-left py-3 px-4">Sana</th><th class="text-left py-3 px-4">Kim</th><th class="text-left py-3 px-4">Amal</th><th class="text-left py-3 px-4">Tafsilot</th></tr></thead>
+                    <tbody class="divide-y divide-slate-100">
+                        ${filteredAudit.map(a=>`
+                            <tr>
+                                <td class="py-3 px-4 text-slate-500 text-xs whitespace-nowrap">${a.date.slice(0,10)} ${a.date.slice(11,16)}</td>
+                                <td class="py-3 px-4">${escapeHtml(a.userName)} <span class="text-slate-400 text-xs">(${a.userRole==='admin'?'admin':'kassir'})</span></td>
+                                <td class="py-3 px-4 font-medium text-slate-700">${escapeHtml(a.action)}</td>
+                                <td class="py-3 px-4 text-slate-500 text-xs">${escapeHtml(a.details||'-')}</td>
+                            </tr>
+                        `).join('') || '<tr><td colspan="4" class="py-8 text-center text-slate-400">Ma\'lumot topilmadi</td></tr>'}
+                    </tbody>
+                </table>
+            </div>
+        `;
     }
 
     document.getElementById('reportContent').innerHTML = html;
@@ -2439,7 +2577,7 @@ function printReport() {
     window.print();
 }
 
-const REPORT_TYPE_LABELS = {sales:'Sotuvlar', products:'Mahsulotlar', profit:'Foyda', returns:'Qaytarishlar', debtors:'Qarzdorlar'};
+const REPORT_TYPE_LABELS = {sales:'Sotuvlar', products:'Mahsulotlar', profit:'Foyda', returns:'Qaytarishlar', debtors:'Qarzdorlar', audit:'Audit jurnal'};
 
 // Ekranda ko'rinib turgan hisobot jadvalidan sarlavha va qatorlarni o'qib oladi
 // (Excel/PDF eksport ikkalasi ham shundan foydalanadi - shu jadvalda nima
