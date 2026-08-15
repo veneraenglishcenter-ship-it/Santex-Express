@@ -15,6 +15,9 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -96,13 +99,13 @@
             </div>
         </div>
         <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-1">
-            <button onclick="navTo('dashboard')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition hover:bg-slate-800 text-slate-300 hover:text-white group" data-page="dashboard">
+            <button onclick="navTo('dashboard')" class="nav-btn admin-only w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition hover:bg-slate-800 text-slate-300 hover:text-white group" data-page="dashboard">
                 <i class="fas fa-chart-line w-5 text-center group-hover:text-cyan-400"></i><span>Boshqaruv paneli</span>
             </button>
             <button onclick="navTo('pos')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition hover:bg-slate-800 text-slate-300 hover:text-white group" data-page="pos">
                 <i class="fas fa-cash-register w-5 text-center group-hover:text-cyan-400"></i><span>Sotish (POS)</span>
             </button>
-            <button onclick="navTo('inventory')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition hover:bg-slate-800 text-slate-300 hover:text-white group" data-page="inventory">
+            <button onclick="navTo('inventory')" class="nav-btn admin-only w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition hover:bg-slate-800 text-slate-300 hover:text-white group" data-page="inventory">
                 <i class="fas fa-boxes w-5 text-center group-hover:text-cyan-400"></i><span>Omborxona</span>
                 <span id="lowStockBadge" class="ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full hidden">0</span>
             </button>
@@ -262,9 +265,15 @@
                                 <button onclick="setPayment('transfer')" class="pay-btn bg-white text-slate-600 py-2 sm:py-2.5 rounded-lg text-sm font-medium border border-slate-200" data-pay="transfer">O'tkazma</button>
                                 <button onclick="setPayment('nasiya')" class="pay-btn bg-white text-slate-600 py-2 sm:py-2.5 rounded-lg text-sm font-medium border border-slate-200" data-pay="nasiya">Nasiya</button>
                             </div>
-                            <div id="nasiyaPaidWrap" class="hidden mb-2.5 sm:mb-3">
-                                <label class="text-xs text-slate-500 block mb-1">Hozir to'langan summa (0 bo'lishi ham mumkin)</label>
-                                <input type="number" id="nasiyaPaid" value="0" min="0" class="w-full px-3 py-2 border border-orange-300 rounded-lg text-sm focus:ring-2 focus:ring-cyan-500 outline-none">
+                            <div id="nasiyaPaidWrap" class="hidden mb-2.5 sm:mb-3 space-y-2">
+                                <div>
+                                    <label class="text-xs text-slate-500 block mb-1">Hozir to'langan summa (0 bo'lishi ham mumkin)</label>
+                                    <input type="number" id="nasiyaPaid" value="0" min="0" class="w-full px-3 py-2 border border-orange-300 rounded-lg text-sm focus:ring-2 focus:ring-cyan-500 outline-none">
+                                </div>
+                                <div>
+                                    <label class="text-xs text-slate-500 block mb-1">Qachon to'lab beradi? (ixtiyoriy)</label>
+                                    <input type="date" id="nasiyaDueDate" class="w-full px-3 py-2 border border-orange-300 rounded-lg text-sm focus:ring-2 focus:ring-cyan-500 outline-none">
+                                </div>
                             </div>
                             <button onclick="checkout()" class="w-full bg-gradient-to-r from-cyan-600 to-blue-600 text-white py-2.5 sm:py-3 rounded-xl font-bold hover:shadow-lg transition">
                                 <i class="fas fa-check-circle mr-2"></i>Sotish
@@ -448,9 +457,12 @@
                         <option value="products">Mahsulotlar</option>
                         <option value="profit">Foyda</option>
                         <option value="returns">Qaytarishlar</option>
+                        <option value="debtors">Qarzdorlar</option>
                     </select>
                     <button onclick="generateReport()" class="bg-cyan-600 text-white px-6 py-2 rounded-lg hover:bg-cyan-700 transition"><i class="fas fa-filter mr-1"></i> Filtrlash</button>
                     <button onclick="printReport()" class="px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600"><i class="fas fa-print mr-1"></i> Chop etish</button>
+                    <button onclick="exportReportExcel()" class="px-4 py-2 border border-green-200 rounded-lg hover:bg-green-50 text-green-700"><i class="fas fa-file-excel mr-1"></i> Excel</button>
+                    <button onclick="exportReportPDF()" class="px-4 py-2 border border-red-200 rounded-lg hover:bg-red-50 text-red-700"><i class="fas fa-file-pdf mr-1"></i> PDF</button>
                     <span class="flex-1"></span>
                     <button onclick="exportBackup()" class="px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600" title="Barcha ma'lumotlarni JSON fayl sifatida yuklab olish"><i class="fas fa-cloud-download-alt mr-1"></i> Zaxira olish</button>
                     <input type="file" id="restoreFile" accept="application/json" class="hidden" onchange="importBackup(event)">
@@ -562,6 +574,10 @@ function normalizeDB(loaded) {
     if (loaded.debtPayments === undefined) loaded.debtPayments = [];
     if (loaded.returns === undefined) loaded.returns = [];
     if (loaded.stockIns === undefined) loaded.stockIns = [];
+    (loaded.customers||[]).forEach(c => {
+        if (c.debtDueDate === undefined) c.debtDueDate = null;
+        if (c.debt <= 0) c.debtDueDate = null;
+    });
     (loaded.orders||[]).forEach(o => {
         if (o.paid === undefined) o.paid = o.payment === 'nasiya' ? 0 : o.total;
         if (o.debtAdded === undefined) o.debtAdded = o.payment === 'nasiya' ? o.total : 0;
@@ -931,11 +947,11 @@ function logout() {
 }
 
 // ==================== NAVIGATION ====================
-const ADMIN_ONLY_PAGES = ['marketing', 'employees', 'reports'];
+const ADMIN_ONLY_PAGES = ['dashboard', 'inventory', 'marketing', 'employees', 'reports'];
 function navTo(page) {
     if (currentUser && currentUser.role !== 'admin' && ADMIN_ONLY_PAGES.includes(page)) {
         showToast('Sizda bu bo\'limga ruxsat yo\'q', 'error');
-        page = 'dashboard';
+        page = 'pos';
     }
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.getElementById('page-'+page).classList.add('active');
@@ -966,7 +982,11 @@ function toggleSidebar() {
 }
 
 function initApp() {
-    renderDashboard();
+    if (currentUser && currentUser.role !== 'admin') {
+        navTo('pos');
+    } else {
+        renderDashboard();
+    }
 }
 
 // ==================== DASHBOARD ====================
@@ -1197,7 +1217,11 @@ function checkout() {
         const cust = db.customers.find(x=>x.id==customerId);
         if(cust) {
             cust.totalPurchases += total;
-            if(debtAdded > 0) cust.debt += debtAdded;
+            if(debtAdded > 0) {
+                cust.debt += debtAdded;
+                const dueDateInput = document.getElementById('nasiyaDueDate');
+                if(dueDateInput && dueDateInput.value) cust.debtDueDate = dueDateInput.value;
+            }
         }
     }
 
@@ -1220,6 +1244,7 @@ function checkout() {
     cart = [];
     document.getElementById('cartDiscount').value = 0;
     document.getElementById('nasiyaPaid').value = 0;
+    document.getElementById('nasiyaDueDate').value = '';
     setPayment('cash');
     renderCart();
     filterPosProducts();
@@ -1881,23 +1906,34 @@ function renderCRM() {
     const search = document.getElementById('crmSearch').value.toLowerCase();
     const filtered = db.customers.filter(c=>c.name.toLowerCase().includes(search)||c.phone.includes(search));
     
-    document.getElementById('crmTable').innerHTML = filtered.map(c=>`
-        <tr class="hover:bg-slate-50">
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('crmTable').innerHTML = filtered.map(c=>{
+        const overdue = c.debt>0 && c.debtDueDate && c.debtDueDate < today;
+        const dueSoon = c.debt>0 && c.debtDueDate && c.debtDueDate === today;
+        return `
+        <tr class="hover:bg-slate-50 ${overdue?'bg-red-50':''}">
             <td class="py-3 px-4">${c.id}</td>
             <td class="py-3 px-4 font-medium">${escapeHtml(c.name)}</td>
             <td class="py-3 px-4 text-slate-500">${escapeHtml(c.phone)}</td>
             <td class="py-3 px-4 text-slate-500 text-xs">${escapeHtml(c.address)}</td>
-            <td class="py-3 px-4 text-right ${c.debt>0?'text-red-600 font-bold':'text-slate-600'}">${formatMoney(c.debt)}</td>
+            <td class="py-3 px-4 text-right ${c.debt>0?'text-red-600 font-bold':'text-slate-600'}">
+                ${formatMoney(c.debt)}
+                ${overdue?`<div class="text-[10px] text-red-600 font-bold mt-0.5"><i class="fas fa-triangle-exclamation"></i> Muddati o'tgan (${escapeHtml(c.debtDueDate)})</div>`:''}
+                ${!overdue && dueSoon?`<div class="text-[10px] text-orange-500 font-bold mt-0.5">Bugun to'lashi kerak</div>`:''}
+                ${!overdue && !dueSoon && c.debt>0 && c.debtDueDate?`<div class="text-[10px] text-slate-400 mt-0.5">Va'da: ${escapeHtml(c.debtDueDate)}</div>`:''}
+            </td>
             <td class="py-3 px-4 text-right text-slate-600">${formatMoney(c.totalPurchases)}</td>
             <td class="py-3 px-4 text-center">
                 ${c.debt>0?`<button onclick="openDebtPaymentModal(${c.id})" class="text-green-600 hover:text-green-800 mr-2" title="To'lov qabul qilish"><i class="fas fa-money-bill-wave"></i></button>`:''}
+                <button onclick="openDebtHistoryModal(${c.id})" class="text-slate-400 hover:text-slate-600 mr-2" title="To'lovlar tarixi"><i class="fas fa-clock-rotate-left"></i></button>
                 ${currentUser && currentUser.role==='admin' ? `
                 <button onclick="editCustomer(${c.id})" class="text-cyan-600 hover:text-cyan-800 mr-2"><i class="fas fa-edit"></i></button>
                 <button onclick="deleteCustomer(${c.id})" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button>
                 ` : ''}
             </td>
         </tr>
-    `).join('');
+    `;
+    }).join('');
     
     const debtCustomers = db.customers.filter(c=>c.debt>0);
     const totalDebt = debtCustomers.reduce((s,c)=>s+c.debt,0);
@@ -1923,7 +1959,11 @@ function openCustomerModal(editId) {
     // Kassir yangi mijoz qo'sha oladi, lekin qarzni qo'lda kiritolmaydi
     // (qarz faqat sotuv/nasiya yoki "To'lov qabul qilish" orqali o'zgaradi)
     const debtField = isAdmin
-        ? `<input type="number" id="cDebt" value="${c?c.debt:0}" placeholder="Qarz" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">`
+        ? `<input type="number" id="cDebt" value="${c?c.debt:0}" placeholder="Qarz" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">
+           <div>
+               <label class="text-xs text-slate-500 block mb-1">Qarzni qachon to'laydi? (ixtiyoriy)</label>
+               <input type="date" id="cDebtDueDate" value="${c&&c.debtDueDate?escapeHtml(c.debtDueDate):''}" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm">
+           </div>`
         : `<input type="hidden" id="cDebt" value="0">`;
     openModal(`
         <div class="p-6">
@@ -1948,15 +1988,17 @@ function openCustomerModal(editId) {
     const phone = document.getElementById('cPhone').value.trim();
     const address = document.getElementById('cAddress').value.trim();
     const debt = parseInt(document.getElementById('cDebt').value)||0;
-    
+    const debtDueDateEl = document.getElementById('cDebtDueDate');
+    const debtDueDate = debt > 0 && debtDueDateEl && debtDueDateEl.value ? debtDueDateEl.value : null;
+
     if(!name) { showToast('FIO kiritilishi shart!', 'error'); return; }
-    
+
     if(editId && editId!=='null') {
         const c = db.customers.find(x=>x.id===editId);
-        if(c) { Object.assign(c, {name, phone, address, debt}); }
+        if(c) { Object.assign(c, {name, phone, address, debt, debtDueDate}); }
     } else {
         const newId = Math.max(...db.customers.map(x=>x.id),0)+1;
-        db.customers.push({id:newId, name, phone, address, debt, totalPurchases:0});
+        db.customers.push({id:newId, name, phone, address, debt, debtDueDate, totalPurchases:0});
     }
     saveDB(); closeModal(); renderCRM(); showToast('Mijoz saqlandi!');
 }
@@ -1973,14 +2015,31 @@ function deleteCustomer(id) {
 function openDebtPaymentModal(id) {
     const c = db.customers.find(x=>x.id===id);
     if(!c) return;
+    const history = (db.debtPayments||[]).filter(p=>p.customerId===id).sort((a,b)=>new Date(b.date)-new Date(a.date));
     openModal(`
         <div class="p-6">
             <h3 class="text-xl font-bold text-slate-800 mb-1">To'lov qabul qilish</h3>
-            <p class="text-sm text-slate-500 mb-4">${escapeHtml(c.name)} — joriy qarz: <span class="font-bold text-red-600">${formatMoney(c.debt)}</span></p>
-            <input type="number" id="debtPayAmount" placeholder="To'lov summasi" min="1" max="${c.debt}" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none mb-4">
-            <div class="flex gap-3">
+            <p class="text-sm text-slate-500 mb-1">${escapeHtml(c.name)} — joriy qarz: <span class="font-bold text-red-600">${formatMoney(c.debt)}</span></p>
+            ${c.debtDueDate ? `<p class="text-xs text-slate-400 mb-3">Va'da qilingan sana: ${escapeHtml(c.debtDueDate)}</p>` : '<div class="mb-3"></div>'}
+            <input type="number" id="debtPayAmount" placeholder="To'lov summasi" min="1" max="${c.debt}" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none mb-3">
+            <div class="mb-4">
+                <label class="text-xs text-slate-500 block mb-1">Qolgan qarzni qachon to'laydi? (ixtiyoriy, qolsa yangilanadi)</label>
+                <input type="date" id="debtPayNewDueDate" value="${c.debtDueDate?escapeHtml(c.debtDueDate):''}" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm">
+            </div>
+            <div class="flex gap-3 mb-4">
                 <button onclick="payDebt(${c.id})" class="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition">To'lovni qabul qilish</button>
                 <button onclick="closeModal()" class="flex-1 border border-slate-200 py-2 rounded-lg hover:bg-slate-50">Bekor qilish</button>
+            </div>
+            <div class="border-t border-slate-100 pt-3">
+                <p class="text-xs font-medium text-slate-500 mb-2">To'lovlar tarixi</p>
+                <div class="space-y-1.5 max-h-40 overflow-y-auto">
+                    ${history.map(p=>`
+                        <div class="flex justify-between text-sm">
+                            <span class="text-slate-400 text-xs">${p.date.slice(0,10)} ${p.date.slice(11,16)}</span>
+                            <span class="font-medium text-green-600">+${formatMoney(p.amount)}</span>
+                        </div>
+                    `).join('') || '<p class="text-slate-300 text-xs">Hali to\'lov bo\'lmagan</p>'}
+                </div>
             </div>
         </div>
     `);
@@ -1993,12 +2052,38 @@ function payDebt(id) {
     if(amount <= 0) { showToast('To\'g\'ri summa kiriting!', 'error'); return; }
     if(amount > c.debt) amount = c.debt;
     c.debt -= amount;
+    const newDueDate = document.getElementById('debtPayNewDueDate');
+    if(c.debt <= 0) c.debtDueDate = null;
+    else if(newDueDate && newDueDate.value) c.debtDueDate = newDueDate.value;
     db.debtPayments = db.debtPayments || [];
     db.debtPayments.push({id:Date.now(), customerId:id, amount, date:new Date().toISOString()});
     saveDB();
     closeModal();
     renderCRM();
     showToast(`${formatMoney(amount)} to'lov qabul qilindi!`);
+}
+
+// Bitta mijozning barcha to'lovlar tarixini alohida ko'rish (POS'dan tashqari,
+// mijozni tez tekshirish uchun)
+function openDebtHistoryModal(id) {
+    const c = db.customers.find(x=>x.id===id);
+    if(!c) return;
+    const history = (db.debtPayments||[]).filter(p=>p.customerId===id).sort((a,b)=>new Date(b.date)-new Date(a.date));
+    openModal(`
+        <div class="p-6">
+            <h3 class="text-xl font-bold text-slate-800 mb-1">To'lovlar tarixi</h3>
+            <p class="text-sm text-slate-500 mb-4">${escapeHtml(c.name)} — joriy qarz: <span class="font-bold ${c.debt>0?'text-red-600':'text-green-600'}">${formatMoney(c.debt)}</span></p>
+            <div class="space-y-2 max-h-72 overflow-y-auto mb-4">
+                ${history.map(p=>`
+                    <div class="flex justify-between items-center p-2.5 bg-slate-50 rounded-lg text-sm">
+                        <span class="text-slate-500">${p.date.slice(0,10)} ${p.date.slice(11,16)}</span>
+                        <span class="font-bold text-green-600">+${formatMoney(p.amount)}</span>
+                    </div>
+                `).join('') || '<p class="text-slate-400 text-sm text-center py-6">Hali to\'lov bo\'lmagan</p>'}
+            </div>
+            <button onclick="closeModal()" class="w-full border border-slate-200 py-2 rounded-lg hover:bg-slate-50">Yopish</button>
+        </div>
+    `);
 }
 
 // ==================== MARKETING ====================
@@ -2309,6 +2394,42 @@ function generateReport() {
                 </table>
             </div>
         `;
+    } else if(type==='debtors') {
+        // Diqqat: bu hisobot sana filtriga bog'liq emas - hozirgi barcha
+        // qarzdorlarning JORIY holatini ko'rsatadi (mustaqil xavfsizlik
+        // yozuvi sifatida - tizimga nima bo'lsa ham qarzlar haqida
+        // to'liq ma'lumot qo'lingizda qolishi uchun).
+        const today = new Date().toISOString().split('T')[0];
+        const debtors = db.customers.filter(c=>c.debt>0).sort((a,b)=>b.debt-a.debt);
+        const totalDebt = debtors.reduce((s,c)=>s+c.debt,0);
+        const overdueCount = debtors.filter(c=>c.debtDueDate && c.debtDueDate < today).length;
+
+        html = `
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div class="bg-red-50 p-4 rounded-xl"><p class="text-slate-500 text-sm">Jami qarzdorlik</p><p class="text-2xl font-bold text-red-700">${formatMoney(totalDebt)}</p></div>
+                <div class="bg-slate-50 p-4 rounded-xl"><p class="text-slate-500 text-sm">Qarzdorlar soni</p><p class="text-2xl font-bold text-slate-700">${debtors.length}</p></div>
+                <div class="bg-orange-50 p-4 rounded-xl"><p class="text-slate-500 text-sm">Muddati o'tganlar</p><p class="text-2xl font-bold text-orange-700">${overdueCount}</p></div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-slate-50 text-slate-500"><tr><th class="text-left py-3 px-4">Mijoz</th><th class="text-left py-3 px-4">Telefon</th><th class="text-right py-3 px-4">Qarz</th><th class="text-left py-3 px-4">Va'da qilingan sana</th><th class="text-center py-3 px-4">Holat</th><th class="text-left py-3 px-4">Oxirgi to'lov</th></tr></thead>
+                    <tbody class="divide-y divide-slate-100">
+                        ${debtors.map(c=>{
+                            const overdue = c.debtDueDate && c.debtDueDate < today;
+                            const lastPay = (db.debtPayments||[]).filter(p=>p.customerId===c.id).sort((a,b)=>new Date(b.date)-new Date(a.date))[0];
+                            return `<tr class="${overdue?'bg-red-50':''}">
+                                <td class="py-3 px-4 font-medium">${escapeHtml(c.name)}</td>
+                                <td class="py-3 px-4 text-slate-500">${escapeHtml(c.phone)}</td>
+                                <td class="py-3 px-4 text-right font-bold text-red-600">${formatMoney(c.debt)}</td>
+                                <td class="py-3 px-4 text-slate-500">${c.debtDueDate?escapeHtml(c.debtDueDate):'-'}</td>
+                                <td class="py-3 px-4 text-center">${overdue?'<span class="bg-red-100 text-red-700 text-xs px-2 py-1 rounded-full font-bold">Muddati o\'tgan</span>':(c.debtDueDate?'<span class="bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded-full">Muddatida</span>':'-')}</td>
+                                <td class="py-3 px-4 text-slate-500 text-xs">${lastPay?formatMoney(lastPay.amount)+' — '+lastPay.date.slice(0,10):'-'}</td>
+                            </tr>`;
+                        }).join('') || '<tr><td colspan="6" class="py-8 text-center text-slate-400">Qarzdorlar yo\'q</td></tr>'}
+                    </tbody>
+                </table>
+            </div>
+        `;
     }
 
     document.getElementById('reportContent').innerHTML = html;
@@ -2316,6 +2437,51 @@ function generateReport() {
 
 function printReport() {
     window.print();
+}
+
+const REPORT_TYPE_LABELS = {sales:'Sotuvlar', products:'Mahsulotlar', profit:'Foyda', returns:'Qaytarishlar', debtors:'Qarzdorlar'};
+
+// Ekranda ko'rinib turgan hisobot jadvalidan sarlavha va qatorlarni o'qib oladi
+// (Excel/PDF eksport ikkalasi ham shundan foydalanadi - shu jadvalda nima
+// ko'rinsa, aynan shu eksport qilinadi).
+function getCurrentReportTable() {
+    const table = document.querySelector('#reportContent table');
+    if(!table) return null;
+    const headers = Array.from(table.querySelectorAll('thead th')).map(th=>th.textContent.trim());
+    const rows = Array.from(table.querySelectorAll('tbody tr')).map(tr =>
+        Array.from(tr.querySelectorAll('td')).map(td=>td.textContent.replace(/\s+/g,' ').trim())
+    );
+    return { headers, rows };
+}
+
+function exportReportExcel() {
+    const t = getCurrentReportTable();
+    if(!t || t.rows.length===0) { showToast('Avval hisobotni shakllantiring!', 'error'); return; }
+    if(typeof XLSX === 'undefined') { showToast('Excel kutubxonasi yuklanmadi, internetni tekshiring!', 'error'); return; }
+    const type = document.getElementById('repType').value;
+    const ws = XLSX.utils.aoa_to_sheet([t.headers, ...t.rows]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, REPORT_TYPE_LABELS[type]||'Hisobot');
+    XLSX.writeFile(wb, `santex-${type}-${new Date().toISOString().split('T')[0]}.xlsx`);
+    showToast('Excel fayl yuklandi!');
+}
+
+function exportReportPDF() {
+    const t = getCurrentReportTable();
+    if(!t || t.rows.length===0) { showToast('Avval hisobotni shakllantiring!', 'error'); return; }
+    if(typeof window.jspdf === 'undefined') { showToast('PDF kutubxonasi yuklanmadi, internetni tekshiring!', 'error'); return; }
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const type = document.getElementById('repType').value;
+    const from = document.getElementById('repFrom').value;
+    const to = document.getElementById('repTo').value;
+    doc.setFontSize(14);
+    doc.text('Santex Express - ' + (REPORT_TYPE_LABELS[type]||'Hisobot'), 14, 15);
+    doc.setFontSize(9);
+    doc.text(`${from} - ${to}`, 14, 21);
+    doc.autoTable({ head: [t.headers], body: t.rows, startY: 26, styles: { fontSize: 8 } });
+    doc.save(`santex-${type}-${new Date().toISOString().split('T')[0]}.pdf`);
+    showToast('PDF fayl yuklandi!');
 }
 
 // ==================== INIT ====================
