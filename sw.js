@@ -1,4 +1,4 @@
-const CACHE_NAME = 'santex-express-v2';
+const CACHE_NAME = 'santex-express-v3';
 const APP_SHELL = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', (event) => {
@@ -28,8 +28,13 @@ self.addEventListener('fetch', (event) => {
   // Faqat internet yo'q bo'lgandagina eski (keshdagi) nusxa ko'rsatiladi.
   const isHTML = event.request.mode === 'navigate' || event.request.destination === 'document';
   if (isHTML) {
+    // { cache: 'no-store' } - brauzerning o'zining oddiy HTTP keshini ham
+    // butunlay chetlab o'tib, har doim serverdan chinakam yangi nusxani
+    // so'raymiz. Aks holda "network-first" mantiqimiz bo'lsa ham, brauzer
+    // ba'zan hali muddati o'tmagan eski nusxani (Service Worker'dan
+    // butunlay tashqarida) o'zi qaytarib yuborishi mumkin edi.
     event.respondWith(
-      fetch(event.request).then((response) => {
+      fetch(event.request.url, { cache: 'no-store' }).then((response) => {
         if (response && response.status === 200) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
