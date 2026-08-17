@@ -338,10 +338,11 @@
                             <input type="text" id="invSearch" oninput="renderInventory()" placeholder="Qidirish..." class="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">
                         </div>
                         <select id="invCategory" onchange="renderInventory()" class="px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none bg-white"><option value="">Barcha kategoriyalar</option></select>
-                        <div class="flex gap-2">
-                            <button onclick="exportInventoryCSV()" class="px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600 text-sm whitespace-nowrap"><i class="fas fa-download mr-1"></i> Excel</button>
-                            <input type="file" id="invImportFile" accept=".csv" class="hidden" onchange="importInventoryCSV(event)">
-                            <button onclick="document.getElementById('invImportFile').click()" class="admin-only px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600 text-sm whitespace-nowrap" title="Avval yuklab olingan Excel (CSV) faylni qayta yuklash"><i class="fas fa-upload mr-1"></i> Yuklash</button>
+                        <div class="flex flex-wrap gap-2">
+                            <button onclick="exportInventoryCSV()" class="px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600 text-sm whitespace-nowrap" title="Hozirgi ombordagi mahsulotlarni Excel qilib yuklab olish"><i class="fas fa-download mr-1"></i> Excel'ga yuklab olish</button>
+                            <button onclick="downloadInventoryTemplate()" class="admin-only px-4 py-2 border border-cyan-300 text-cyan-700 rounded-lg hover:bg-cyan-50 text-sm whitespace-nowrap" title="Ko'p mahsulotni birdaniga qo'shish uchun bo'sh Excel shablon"><i class="fas fa-file-arrow-down mr-1"></i> Shablon olish</button>
+                            <input type="file" id="invImportFile" accept=".xlsx,.xls,.csv" class="hidden" onchange="importInventoryFile(event)">
+                            <button onclick="document.getElementById('invImportFile').click()" class="admin-only px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600 text-sm whitespace-nowrap" title="To'ldirilgan Excel (yoki CSV) faylni yuklash - minglab mahsulotni birdaniga qo'shish/yangilash mumkin"><i class="fas fa-upload mr-1"></i> Ommaviy yuklash</button>
                         </div>
                     </div>
                     <div class="overflow-x-auto">
@@ -1203,6 +1204,41 @@ function handleScannedBarcode(code) {
     }
 }
 
+// Har qanday forma ichida (masalan "Mahsulot qo'shish"), formani yopmasdan
+// turib, shtrix-kod maydonini kamera bilan avtomatik to'ldirish uchun.
+// "#inlineScannerArea" nomli konteyner o'sha forma ichida bo'lishi kerak.
+function toggleInlineScanner(targetInputId) {
+    const area = document.getElementById('inlineScannerArea');
+    if(!area) return;
+    if(activeHtml5QrScanner) {
+        stopBarcodeScanner();
+        area.classList.add('hidden');
+        area.innerHTML = '';
+        return;
+    }
+    if(typeof Html5Qrcode === 'undefined') { showToast('Skaner kutubxonasi yuklanmadi, internetni tekshiring!', 'error'); return; }
+    area.classList.remove('hidden');
+    activeHtml5QrScanner = new Html5Qrcode('inlineScannerArea');
+    activeHtml5QrScanner.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 220, height: 120 } },
+        (decodedText) => {
+            const input = document.getElementById(targetInputId);
+            if(input) input.value = decodedText;
+            showToast('Shtrix-kod o\'qildi: ' + decodedText);
+            stopBarcodeScanner();
+            area.classList.add('hidden');
+            area.innerHTML = '';
+        },
+        () => {}
+    ).catch(err => {
+        console.error('Kamera ochilmadi', err);
+        activeHtml5QrScanner = null;
+        area.classList.add('hidden');
+        showToast('Kamerani ochib bo\'lmadi — ruxsat berilganini tekshiring', 'error');
+    });
+}
+
 function renderCart() {
     const container = document.getElementById('cartItems');
     const countEl = document.getElementById('cartCount');
@@ -1888,7 +1924,11 @@ function openProductModal(editId) {
                     <input type="number" id="pStock" value="${p?p.stock:''}" placeholder="Qoldiq" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">
                     <input type="number" id="pMinStock" value="${p?p.minStock:''}" placeholder="Minimal qoldiq" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">
                 </div>
-                <input type="text" id="pBarcode" value="${p?escapeHtml(p.barcode):''}" placeholder="Shtrix-kod" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">
+                <div class="flex gap-2">
+                    <input type="text" id="pBarcode" value="${p?escapeHtml(p.barcode):''}" placeholder="Shtrix-kod" class="flex-1 px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">
+                    <button type="button" onclick="toggleInlineScanner('pBarcode')" class="px-4 border border-cyan-300 text-cyan-600 rounded-lg hover:bg-cyan-50" title="Kamera bilan skanerlash"><i class="fas fa-camera"></i></button>
+                </div>
+                <div id="inlineScannerArea" class="hidden rounded-xl overflow-hidden bg-black" style="min-height:220px;"></div>
                 <div class="flex gap-3 mt-4">
                     <button onclick="saveProduct(${p?p.id:'null'})" class="flex-1 bg-cyan-600 text-white py-2 rounded-lg hover:bg-cyan-700 transition">Saqlash</button>
                     <button onclick="closeModal()" class="flex-1 border border-slate-200 py-2 rounded-lg hover:bg-slate-50">Bekor qilish</button>
@@ -1948,53 +1988,113 @@ function deleteProduct(id) {
     saveDB(); renderInventory(); showToast('O\'chirildi!');
 }
 
+const INVENTORY_IMPORT_HEADERS = ['Nomi','Kategoriya','Shtrix-kod','Narxi','Tan narxi','Qoldiq','Minimal qoldiq'];
+
 function exportInventoryCSV() {
-    let csv = 'Nomi,Kategoriya,Shtrix-kod,Narxi,Sotib olish,Qoldiq\n';
-    db.products.forEach(p=>{ csv+=`${p.name},${p.category},${p.barcode},${p.price},${p.cost},${p.stock}\n`; });
-    const blob = new Blob([csv],{type:'text/csv'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href=url; a.download='santex-ombor.csv'; a.click();
-    showToast('CSV yuklandi!');
+    if(typeof XLSX === 'undefined') { showToast('Excel kutubxonasi yuklanmadi, internetni tekshiring!', 'error'); return; }
+    const rows = [INVENTORY_IMPORT_HEADERS, ...db.products.map(p=>[p.name, p.category, p.barcode, p.price, p.cost, p.stock, p.minStock])];
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Ombor');
+    XLSX.writeFile(wb, 'santex-ombor.xlsx');
+    showToast('Excel fayl yuklandi!');
 }
 
-function importInventoryCSV(event) {
+// 5000-10000 kabi ko'p mahsulotni birdaniga qo'shish uchun: shu shablonni
+// yuklab, Excel'da to'ldirib, keyin "Ommaviy yuklash" orqali qaytaring.
+function downloadInventoryTemplate() {
+    if(!requireAdmin()) return;
+    if(typeof XLSX === 'undefined') { showToast('Excel kutubxonasi yuklanmadi, internetni tekshiring!', 'error'); return; }
+    const rows = [
+        INVENTORY_IMPORT_HEADERS,
+        ['Masalan: Sharavoy kran (latun)', 'Kranlar', '10001', 45000, 28000, 12, 5]
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Shablon');
+    XLSX.writeFile(wb, 'santex-ombor-shablon.xlsx');
+    showToast('Shablon yuklandi! To\'ldirib, "Ommaviy yuklash" orqali qaytaring.');
+}
+
+// Vergul ichida ham (masalan mahsulot nomida) to'g'ri ishlaydigan oddiy CSV qatorini ajratuvchi
+function parseCsvLine(line) {
+    const result = [];
+    let cur = '', inQuotes = false;
+    for(let i=0; i<line.length; i++) {
+        const ch = line[i];
+        if(inQuotes) {
+            if(ch === '"') { if(line[i+1] === '"') { cur += '"'; i++; } else inQuotes = false; }
+            else cur += ch;
+        } else {
+            if(ch === '"') inQuotes = true;
+            else if(ch === ',') { result.push(cur); cur = ''; }
+            else cur += ch;
+        }
+    }
+    result.push(cur);
+    return result;
+}
+
+function importInventoryFile(event) {
     if(!requireAdmin()) { event.target.value=''; return; }
     const file = event.target.files[0];
     if(!file) return;
+    const isExcel = /\.(xlsx|xls)$/i.test(file.name);
     const reader = new FileReader();
     reader.onload = function(e) {
         try {
-            const lines = e.target.result.split(/\r?\n/).filter(l=>l.trim().length>0);
-            if(lines.length < 2) { showToast('Fayl bo\'sh yoki noto\'g\'ri!', 'error'); event.target.value=''; return; }
-            let added = 0, updated = 0;
-            for(let i=1; i<lines.length; i++) {
-                const cols = lines[i].split(',');
-                if(cols.length < 6) continue;
-                const [name, category, barcode, price, cost, stock] = cols.map(c=>c.trim());
-                if(!name) continue;
-                const priceNum = parseInt(price)||0;
-                const costNum = parseInt(cost)||0;
-                const stockNum = parseInt(stock)||0;
-                let existing = db.products.find(p=>p.barcode && barcode && p.barcode===barcode);
-                if(!existing) existing = db.products.find(p=>p.name.toLowerCase()===name.toLowerCase());
-                if(existing) {
-                    Object.assign(existing, {name, category: category||existing.category, price: priceNum, cost: costNum, stock: stockNum});
-                    updated++;
-                } else {
-                    if(category && !db.categories.includes(category)) db.categories.push(category);
-                    const newId = Math.max(...db.products.map(x=>x.id),0)+1;
-                    db.products.push({id:newId, name, category: category||db.categories[0]||'Boshqa', price: priceNum, cost: costNum, stock: stockNum, barcode: barcode||('IMP'+newId), minStock: 5});
-                    added++;
-                }
+            let rows;
+            if(isExcel) {
+                if(typeof XLSX === 'undefined') { showToast('Excel kutubxonasi yuklanmadi, internetni tekshiring!', 'error'); event.target.value=''; return; }
+                const wb = XLSX.read(e.target.result, {type:'array'});
+                const sheet = wb.Sheets[wb.SheetNames[0]];
+                rows = XLSX.utils.sheet_to_json(sheet, {header:1, raw:false, defval:''});
+            } else {
+                rows = e.target.result.split(/\r?\n/).filter(l=>l.trim().length>0).map(parseCsvLine);
             }
-            saveDB(); renderInventory();
-            showToast(`Yuklandi: ${updated} yangilandi, ${added} qo'shildi!`);
+            processInventoryImportRows(rows);
         } catch(err) {
+            console.error(err);
             showToast('Faylni o\'qib bo\'lmadi!', 'error');
         }
         event.target.value = '';
     };
-    reader.readAsText(file);
+    if(isExcel) reader.readAsArrayBuffer(file);
+    else reader.readAsText(file);
+}
+
+// rows[0] - sarlavha qatori (o'tkazib yuboriladi), qolganlari - mahsulotlar.
+// Har bir qator: [Nomi, Kategoriya, Shtrix-kod, Narxi, Tan narxi, Qoldiq, Minimal qoldiq]
+function processInventoryImportRows(rows) {
+    if(!rows || rows.length < 2) { showToast('Fayl bo\'sh yoki noto\'g\'ri!', 'error'); return; }
+    let added = 0, updated = 0;
+    for(let i=1; i<rows.length; i++) {
+        const cols = rows[i];
+        if(!cols || cols.length < 1) continue;
+        const name = (cols[0]||'').toString().trim();
+        if(!name) continue;
+        const category = (cols[1]||'').toString().trim();
+        const barcode = (cols[2]||'').toString().trim();
+        const priceNum = parseInt(cols[3])||0;
+        const costNum = parseInt(cols[4])||0;
+        const stockNum = parseInt(cols[5])||0;
+        const minStockNum = cols[6]!==undefined && cols[6]!=='' ? (parseInt(cols[6])||0) : 5;
+
+        let existing = db.products.find(p=>p.barcode && barcode && p.barcode===barcode);
+        if(!existing) existing = db.products.find(p=>p.name.toLowerCase()===name.toLowerCase());
+        if(existing) {
+            Object.assign(existing, {name, category: category||existing.category, price: priceNum, cost: costNum, stock: stockNum, minStock: cols[6]!==undefined && cols[6]!=='' ? minStockNum : existing.minStock});
+            updated++;
+        } else {
+            if(category && !db.categories.includes(category)) db.categories.push(category);
+            const newId = Math.max(...db.products.map(x=>x.id),0)+1;
+            db.products.push({id:newId, name, category: category||db.categories[0]||'Boshqa', price: priceNum, cost: costNum, stock: stockNum, barcode: barcode||('IMP'+newId), minStock: minStockNum});
+            added++;
+        }
+    }
+    saveDB(); renderInventory();
+    logAudit('Omborga ommaviy yuklash', `${added} ta yangi, ${updated} ta yangilandi`);
+    showToast(`Yuklandi: ${updated} yangilandi, ${added} qo'shildi!`);
 }
 
 // ==================== CRM ====================
