@@ -227,16 +227,16 @@
             <div id="page-pos" class="page h-full">
                 <div class="flex flex-col lg:flex-row gap-4 lg:gap-6 h-full min-h-0">
                     <div class="flex flex-col min-h-0 basis-0 flex-[2] lg:flex-1">
-                        <div class="flex gap-2 sm:gap-3 mb-3 flex-shrink-0">
+                        <div class="flex gap-1.5 sm:gap-3 mb-3 flex-shrink-0">
                             <div class="flex-1 relative min-w-0">
                                 <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
-                                <input type="text" id="posSearch" placeholder="Mahsulot qidirish..." oninput="filterPosProducts()" class="w-full pl-10 pr-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500 outline-none">
+                                <input type="text" id="posSearch" placeholder="Mahsulot qidirish..." oninput="filterPosProducts()" class="w-full pl-9 sm:pl-10 pr-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500 outline-none">
                             </div>
-                            <select id="posCategory" onchange="filterPosProducts()" class="w-32 sm:w-auto flex-shrink-0 px-2 sm:px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500 outline-none bg-white text-sm"></select>
-                            <button onclick="openBarcodeScannerModal()" class="flex-shrink-0 px-3 sm:px-4 py-2.5 border border-cyan-300 text-cyan-700 rounded-xl hover:bg-cyan-50 text-sm font-medium whitespace-nowrap" title="Shtrix-kod skaner">
+                            <select id="posCategory" onchange="filterPosProducts()" class="w-20 sm:w-auto flex-shrink-0 px-1.5 sm:px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500 outline-none bg-white text-xs sm:text-sm"></select>
+                            <button onclick="openBarcodeScannerModal()" class="flex-shrink-0 w-10 sm:w-auto flex items-center justify-center sm:px-4 py-2.5 border border-cyan-300 text-cyan-700 rounded-xl hover:bg-cyan-50 text-sm font-medium" title="Shtrix-kod skaner">
                                 <i class="fas fa-barcode"></i><span class="hidden sm:inline ml-1">Skaner</span>
                             </button>
-                            <button onclick="openReturnModal()" class="flex-shrink-0 px-3 sm:px-4 py-2.5 border border-orange-300 text-orange-600 rounded-xl hover:bg-orange-50 text-sm font-medium whitespace-nowrap" title="Mahsulot qaytarish (vozvrat)">
+                            <button onclick="openReturnModal()" class="flex-shrink-0 w-10 sm:w-auto flex items-center justify-center sm:px-4 py-2.5 border border-orange-300 text-orange-600 rounded-xl hover:bg-orange-50 text-sm font-medium" title="Mahsulot qaytarish (vozvrat)">
                                 <i class="fas fa-rotate-left"></i><span class="hidden sm:inline ml-1">Qaytarish</span>
                             </button>
                         </div>
@@ -335,12 +335,11 @@
                     <div class="p-4 border-b border-slate-100 flex flex-col sm:flex-row gap-3">
                         <div class="relative flex-1">
                             <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
-                            <input type="text" id="invSearch" oninput="renderInventory()" placeholder="Qidirish..." class="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">
+                            <input type="text" id="invSearch" oninput="onInventoryFilterChange()" placeholder="Qidirish..." class="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none">
                         </div>
-                        <select id="invCategory" onchange="renderInventory()" class="px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none bg-white"><option value="">Barcha kategoriyalar</option></select>
+                        <select id="invCategory" onchange="onInventoryFilterChange()" class="px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 outline-none bg-white"><option value="">Barcha kategoriyalar</option></select>
                         <div class="flex flex-wrap gap-2">
-                            <button onclick="exportInventoryCSV()" class="px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600 text-sm whitespace-nowrap" title="Hozirgi ombordagi mahsulotlarni Excel qilib yuklab olish"><i class="fas fa-download mr-1"></i> Excel'ga yuklab olish</button>
-                            <button onclick="downloadInventoryTemplate()" class="admin-only px-4 py-2 border border-cyan-300 text-cyan-700 rounded-lg hover:bg-cyan-50 text-sm whitespace-nowrap" title="Ko'p mahsulotni birdaniga qo'shish uchun bo'sh Excel shablon"><i class="fas fa-file-arrow-down mr-1"></i> Shablon olish</button>
+                            <button onclick="exportInventoryCSV()" class="px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600 text-sm whitespace-nowrap" title="Hozirgi ombordagi mahsulotlarni Excel qilib yuklab olish - shu faylni to'ldirib, qayta yuklashingiz mumkin"><i class="fas fa-download mr-1"></i> Excel'ga yuklab olish</button>
                             <input type="file" id="invImportFile" accept=".xlsx,.xls,.csv" class="hidden" onchange="importInventoryFile(event)">
                             <button onclick="document.getElementById('invImportFile').click()" class="admin-only px-4 py-2 border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600 text-sm whitespace-nowrap" title="To'ldirilgan Excel (yoki CSV) faylni yuklash - minglab mahsulotni birdaniga qo'shish/yangilash mumkin"><i class="fas fa-upload mr-1"></i> Ommaviy yuklash</button>
                         </div>
@@ -353,6 +352,7 @@
                             <tbody id="inventoryTable" class="divide-y divide-slate-100"></tbody>
                         </table>
                     </div>
+                    <div id="invPagination" class="flex items-center justify-between px-4 py-3 border-t border-slate-100"></div>
                 </div>
             </div>
 
@@ -674,6 +674,10 @@ let syncInFlight = false;
 // tekshiriladi (optimistic concurrency). Agar boshqa qurilma bizdan oldin
 // ulgurib yozgan bo'lsa - qaytadan o'qib, qaytadan birlashtirib, qayta
 // urinamiz (bir necha marotaba), shunda hech narsa yo'qolmaydi.
+// Bulutdagi so'nggi bilgan updated_at - katta ma'lumotni har safar to'liq
+// yubormasdan, faqat haqiqatan biror narsa o'zgarganda sinxronlash uchun.
+let lastKnownUpdatedAt = null;
+
 async function pushToCloud() {
     if(!sb || syncInFlight) return;
     syncInFlight = true;
@@ -715,6 +719,7 @@ async function pushToCloud() {
                     localStorage.setItem('santexDB', JSON.stringify(db));
                     refreshCurrentPage();
                 }
+                lastKnownUpdatedAt = newUpdatedAt;
                 snapshotBaseline();
                 setSyncStatus('synced');
                 return;
@@ -744,6 +749,7 @@ async function pullFromCloud() {
         if(data && data.data) {
             db = normalizeDB(data.data);
             localStorage.setItem('santexDB', JSON.stringify(db));
+            lastKnownUpdatedAt = data.updated_at;
             snapshotBaseline();
             setSyncStatus('synced');
             return true;
@@ -761,6 +767,19 @@ async function pullFromCloud() {
     return false;
 }
 
+// Faqat updated_at'ni o'qiydi (juda kichik so'rov) - agar bulutda haqiqatan
+// biror narsa o'zgargan bo'lsa (boshqa qurilma tomonidan), o'shandagina
+// to'liq ma'lumotni olib, birlashtiradi. Mahsulotlar soni minglab bo'lsa
+// ham, hech narsa o'zgarmagan paytda katta ma'lumot behuda yuborilmaydi.
+async function lightSyncCheck() {
+    if(!sb || syncInFlight) return;
+    try {
+        const { data, error } = await sb.from('app_data').select('updated_at').eq('id', CLOUD_ROW_ID).maybeSingle();
+        if(error || !data) return;
+        if(data.updated_at !== lastKnownUpdatedAt) await pushToCloud();
+    } catch(e) { /* jim - keyingi safar qayta urinamiz */ }
+}
+
 // Boshqa qurilma saqlagan ZAHOTI shu ekranga ham darhol xabar berish uchun
 // Supabase Realtime orqali ulanish (websocket). Ishlashi uchun bulutda
 // bir marta: alter publication supabase_realtime add table app_data;
@@ -773,7 +792,7 @@ function startRealtimeSync() {
         realtimeChannel = sb
             .channel('app_data_' + CLOUD_ROW_ID)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'app_data', filter: `id=eq.${CLOUD_ROW_ID}` },
-                () => { if(!syncInFlight) pushToCloud(); })
+                () => lightSyncCheck())
             .subscribe();
     } catch(e) { console.warn('Realtime ulanmadi', e); }
 }
@@ -786,7 +805,7 @@ function stopRealtimeSync() {
 let periodicSyncTimer = null;
 function startPeriodicSync() {
     stopPeriodicSync();
-    periodicSyncTimer = setInterval(() => { if(!syncInFlight) pushToCloud(); }, 15000);
+    periodicSyncTimer = setInterval(() => lightSyncCheck(), 15000);
 }
 function stopPeriodicSync() {
     if(periodicSyncTimer) { clearInterval(periodicSyncTimer); periodicSyncTimer = null; }
@@ -1091,6 +1110,10 @@ function initPOS() {
     filterPosProducts();
 }
 
+// Katalog minglab mahsulotdan iborat bo'lsa ham POS tez ishlashi uchun,
+// bir vaqtda faqat shuncha karta chiziladi - qidiruv orqali toraytirish talab qilinadi.
+const POS_MAX_CARDS = 120;
+
 function filterPosProducts() {
     const search = document.getElementById('posSearch').value.toLowerCase();
     const cat = document.getElementById('posCategory').value;
@@ -1109,7 +1132,11 @@ function filterPosProducts() {
             </div>`;
         return;
     }
-    document.getElementById('posProducts').innerHTML = filtered.map(p => {
+    const shown = filtered.slice(0, POS_MAX_CARDS);
+    const extraNote = filtered.length > POS_MAX_CARDS
+        ? `<div class="col-span-full text-center text-xs text-slate-400 py-2">... yana ${filtered.length - POS_MAX_CARDS} ta bor. Aniqrog'ini ko'rish uchun qidiruvni davom ettiring</div>`
+        : '';
+    document.getElementById('posProducts').innerHTML = shown.map(p => {
         const low = p.stock <= p.minStock;
         return `
         <div onclick="addToCart(${p.id})" class="product-card bg-white rounded-2xl shadow-sm border ${low?'border-red-200':'border-slate-100'} overflow-hidden flex flex-col select-none h-[168px]">
@@ -1125,7 +1152,7 @@ function filterPosProducts() {
                 </div>
             </div>
         </div>`;
-    }).join('');
+    }).join('') + extraNote;
 }
 
 function addToCart(pid) {
@@ -1573,6 +1600,21 @@ function processReturn(orderId) {
 }
 
 // ==================== INVENTORY ====================
+// Minglab mahsulot bo'lsa ham sahifa sekinlashib qolmasligi uchun,
+// jadval bir vaqtda faqat INV_PAGE_SIZE tasini chizadi (sahifalash).
+const INV_PAGE_SIZE = 50;
+let invCurrentPage = 1;
+
+function onInventoryFilterChange() {
+    invCurrentPage = 1;
+    renderInventory();
+}
+
+function changeInvPage(delta) {
+    invCurrentPage += delta;
+    renderInventory();
+}
+
 function renderInventory() {
     const search = document.getElementById('invSearch').value.toLowerCase();
     const cat = document.getElementById('invCategory').value;
@@ -1596,10 +1638,16 @@ function renderInventory() {
     if(statCost) statCost.textContent = formatMoney(costValue);
     if(statCount) statCount.textContent = `${db.products.length} / ${totalUnits}`;
     if(statLow) statLow.textContent = lowCount;
-    
-    document.getElementById('inventoryTable').innerHTML = filtered.map((p,i)=>`
+
+    const totalPages = Math.max(1, Math.ceil(filtered.length / INV_PAGE_SIZE));
+    if(invCurrentPage > totalPages) invCurrentPage = totalPages;
+    if(invCurrentPage < 1) invCurrentPage = 1;
+    const startIdx = (invCurrentPage-1) * INV_PAGE_SIZE;
+    const pageItems = filtered.slice(startIdx, startIdx + INV_PAGE_SIZE);
+
+    document.getElementById('inventoryTable').innerHTML = pageItems.map((p,i)=>`
         <tr class="${p.stock<=p.minStock?'bg-red-50':''}">
-            <td class="py-3 px-4">${i+1}</td>
+            <td class="py-3 px-4">${startIdx+i+1}</td>
             <td class="py-3 px-4 font-medium">${escapeHtml(p.name)}</td>
             <td class="py-3 px-4"><span class="bg-slate-100 text-slate-600 text-xs px-2 py-1 rounded-lg">${escapeHtml(p.category)}</span></td>
             <td class="py-3 px-4 text-slate-500 text-xs">${escapeHtml(p.barcode)}</td>
@@ -1614,6 +1662,18 @@ function renderInventory() {
             </td>
         </tr>
     `).join('');
+
+    const paginationEl = document.getElementById('invPagination');
+    if(paginationEl) {
+        paginationEl.innerHTML = filtered.length > INV_PAGE_SIZE ? `
+            <span class="text-xs text-slate-400">${filtered.length} tadan ${startIdx+1}-${Math.min(startIdx+INV_PAGE_SIZE, filtered.length)}</span>
+            <div class="flex items-center gap-2">
+                <button onclick="changeInvPage(-1)" ${invCurrentPage<=1?'disabled':''} class="px-3 py-1.5 border border-slate-200 rounded-lg text-sm ${invCurrentPage<=1?'text-slate-300':'hover:bg-slate-50 text-slate-600'}"><i class="fas fa-chevron-left"></i></button>
+                <span class="text-sm text-slate-500">${invCurrentPage} / ${totalPages}</span>
+                <button onclick="changeInvPage(1)" ${invCurrentPage>=totalPages?'disabled':''} class="px-3 py-1.5 border border-slate-200 rounded-lg text-sm ${invCurrentPage>=totalPages?'text-slate-300':'hover:bg-slate-50 text-slate-600'}"><i class="fas fa-chevron-right"></i></button>
+            </div>
+        ` : '';
+    }
 
     renderInventoryVelocity();
 }
@@ -1998,22 +2058,6 @@ function exportInventoryCSV() {
     XLSX.utils.book_append_sheet(wb, ws, 'Ombor');
     XLSX.writeFile(wb, 'santex-ombor.xlsx');
     showToast('Excel fayl yuklandi!');
-}
-
-// 5000-10000 kabi ko'p mahsulotni birdaniga qo'shish uchun: shu shablonni
-// yuklab, Excel'da to'ldirib, keyin "Ommaviy yuklash" orqali qaytaring.
-function downloadInventoryTemplate() {
-    if(!requireAdmin()) return;
-    if(typeof XLSX === 'undefined') { showToast('Excel kutubxonasi yuklanmadi, internetni tekshiring!', 'error'); return; }
-    const rows = [
-        INVENTORY_IMPORT_HEADERS,
-        ['Masalan: Sharavoy kran (latun)', 'Kranlar', '10001', 45000, 28000, 12, 5]
-    ];
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Shablon');
-    XLSX.writeFile(wb, 'santex-ombor-shablon.xlsx');
-    showToast('Shablon yuklandi! To\'ldirib, "Ommaviy yuklash" orqali qaytaring.');
 }
 
 // Vergul ichida ham (masalan mahsulot nomida) to'g'ri ishlaydigan oddiy CSV qatorini ajratuvchi
